@@ -1,0 +1,25 @@
+# 编译输出
+*.exe
+*.out
+*.o
+*.obj
+*.dll
+*.so
+*.a
+*.lib
+*.dylib
+
+# 链接可执行文件
+test
+
+# 编译目录
+Debug/
+Release/
+build/
+out/
+dist/
+cmake-build-*/
+
+# OS 文件
+.DS_Store
+Thumbs.db
