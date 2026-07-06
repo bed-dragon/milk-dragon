@@ -22,7 +22,7 @@ int main() {
     for (int n : nums) {
         sum += n;
     }
-    std::cout << "总和: " << sum << std::endl;
+    std::cout << "总和 " << sum << std::endl;
 
     return 0;
 }
