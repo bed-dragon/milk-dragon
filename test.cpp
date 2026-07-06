@@ -2,6 +2,8 @@
 #include <vector>
 #include <algorithm>
 
+using namespace std;
+
 int main() {
     std::vector<int> nums = {5, 2, 8, 1, 9, 3};
 
