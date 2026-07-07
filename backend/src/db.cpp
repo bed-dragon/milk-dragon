@@ -26,7 +26,7 @@ sqlite3* open_db() {
     int rc = sqlite3_open("../data/study.db", &db);
     if (rc != SQLITE_OK) {
         // cerr 是标准错误输出，类似 cout 但专门打错误日志
-        cerr << "❌ 无法打开数据库: " << sqlite3_errmsg(db) << endl;
+        cerr << "[ERROR] 无法打开数据库: " << sqlite3_errmsg(db) << endl;
         return nullptr;
     }
     return db;
@@ -50,7 +50,7 @@ static bool exec_sql(sqlite3* db, const string& sql) {
     //   参数5: 错误信息（如果出错会把错误文字写到这里）
     int rc = sqlite3_exec(db, sql.c_str(), 0, 0, &err_msg);
     if (rc != SQLITE_OK) {
-        cerr << "❌ SQL 执行出错: " << err_msg << endl;
+        cerr << "[ERROR] SQL 执行出错: " << err_msg << endl;
         // sqlite3_free 释放错误信息占用的内存，否则会内存泄漏
         sqlite3_free(err_msg);
         return false;
@@ -250,5 +250,5 @@ void init_tables() {
     )");
 
     sqlite3_close(db);
-    cout << "✅ 数据库初始化完成（所有表已就绪）" << endl;
+    cout << "[OK] 数据库初始化完成，所有表已就绪" << endl;
 }
