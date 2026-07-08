@@ -100,8 +100,8 @@
     const isInPages = currentPath.includes('/pages/');
 
     const pages = isInPages
-      ? ['../index.html', 'checkin.html', 'stats.html', 'reminders.html', 'tasks.html']
-      : ['pages/tasks.html', 'pages/checkin.html', 'pages/stats.html', 'pages/reminders.html'];
+      ? ['../index.html', 'checkin.html', 'stats.html', 'reminders.html', 'tasks.html', 'pomodoro.html']
+      : ['pages/tasks.html', 'pages/checkin.html', 'pages/stats.html', 'pages/reminders.html', 'pages/pomodoro.html'];
 
     // 排除当前页面
     const currentPage = currentPath.split('/').pop() || 'index.html';

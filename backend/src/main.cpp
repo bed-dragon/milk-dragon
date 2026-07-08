@@ -2,6 +2,7 @@
 #include "httplib.h"
 #include "db.h"
 #include "json.hpp"
+#include "routes_tasks.h"
 
 using namespace httplib;
 using json = nlohmann::json;
@@ -36,115 +37,18 @@ int main() {
         res.set_content(R"({"ok":true,"msg":"hello, 后端已启动!"})", "application/json");
     });
 
-    // ---------------- 任务接口（真实数据库操作） ----------------
+    // ---------------- 任务接口 ----------------
+    svr.Get("/api/tasks",              handle_get_tasks);
+    svr.Get(R"(/api/tasks/(\d+))",     handle_get_one_task);
+    svr.Post("/api/tasks",             handle_create_task);
+    svr.Put(R"(/api/tasks/(\d+))",     handle_update_task);
+    svr.Delete(R"(/api/tasks/(\d+))",  handle_delete_task);
 
     // 辅助：从请求中获取 user_id（暂默认 1，等 auth 模块完成后从 token 解析）
     auto get_uid = [](const Request& req) -> int {
         if (req.has_param("user_id")) return stoi(req.get_param_value("user_id"));
         return 1;  // 默认用户 ID
     };
-
-    // GET /api/tasks — 获取任务列表
-    svr.Get("/api/tasks", [&](const Request& req, Response& res) {
-        int user_id = get_uid(req);
-        string data_str = task_get_list(user_id);
-        json resp = {
-            {"ok", true},
-            {"data", json::parse(data_str)}
-        };
-        res.set_content(resp.dump(), "application/json");
-    });
-
-    // GET /api/tasks/:id — 获取单个任务
-    svr.Get(R"(/api/tasks/(\d+))", [&](const Request& req, Response& res) {
-        int task_id = stoi(req.matches[1]);
-        string data_str = task_get_one(task_id);
-        json obj = json::parse(data_str);
-        if (obj.empty()) {
-            res.status = 404;
-            res.set_content(R"({"ok":false,"error":"task not found"})", "application/json");
-            return;
-        }
-        json resp = {{"ok", true}, {"data", obj}};
-        res.set_content(resp.dump(), "application/json");
-    });
-
-    // POST /api/tasks — 创建任务
-    svr.Post("/api/tasks", [&](const Request& req, Response& res) {
-        try {
-            json body = json::parse(req.body);
-            int user_id = body.value("user_id", 1);
-            string title = body.value("title", "");
-            string topic = body.value("topic", "");
-            string deadline = body.value("deadline", "");
-            int priority = body.value("priority", 1);
-            // 兼容前端发数字 (1/0) 或布尔 (true/false)
-            bool need_review = false;
-            if (body.contains("need_review")) {
-                try {
-                    auto& nr = body["need_review"];
-                    if (nr.is_boolean()) need_review = nr.get<bool>();
-                    else if (nr.is_number_integer()) need_review = (nr != 0);
-                    else if (nr.is_number()) need_review = (nr != 0);
-                } catch (...) { need_review = false; }
-            }
-
-            int new_id = task_create(user_id, title, topic, deadline, priority, need_review);
-            if (new_id > 0) {
-                json resp = {{"ok", true}, {"data", {{"id", new_id}}}};
-                res.set_content(resp.dump(), "application/json");
-            } else {
-                res.status = 500;
-                res.set_content(R"({"ok":false,"error":"创建任务失败"})", "application/json");
-            }
-        } catch (const exception& e) {
-            res.status = 400;
-            json resp = {{"ok", false}, {"error", string("请求解析失败: ") + e.what()}};
-            res.set_content(resp.dump(), "application/json");
-        }
-    });
-
-    // PUT /api/tasks/:id — 更新任务（支持部分字段更新）
-    svr.Put(R"(/api/tasks/(\d+))", [&](const Request& req, Response& res) {
-        try {
-            int task_id = stoi(req.matches[1]);
-            json body = json::parse(req.body);
-            int user_id = body.value("user_id", 1);
-
-            // 遍历 body 中的每个字段，逐一调用 task_update
-            int updated = 0;
-            for (auto& [key, val] : body.items()) {
-                if (key == "user_id") continue;  // user_id 不是任务字段
-                string value_str;
-                if (val.is_string()) value_str = val.get<string>();
-                else if (val.is_number()) value_str = to_string(val.get<int>());
-                else if (val.is_boolean()) value_str = val.get<bool>() ? "1" : "0";
-                else continue;
-
-                if (task_update(task_id, user_id, key, value_str)) updated++;
-            }
-
-            json resp = {{"ok", true}, {"message", "updated"}, {"fields_updated", updated}};
-            res.set_content(resp.dump(), "application/json");
-        } catch (const exception& e) {
-            res.status = 400;
-            json resp = {{"ok", false}, {"error", string("请求解析失败: ") + e.what()}};
-            res.set_content(resp.dump(), "application/json");
-        }
-    });
-
-    // DELETE /api/tasks/:id — 删除任务
-    svr.Delete(R"(/api/tasks/(\d+))", [&](const Request& req, Response& res) {
-        int task_id = stoi(req.matches[1]);
-        int user_id = get_uid(req);
-
-        if (task_delete(task_id, user_id)) {
-            res.set_content(R"({"ok":true})", "application/json");
-        } else {
-            res.status = 404;
-            res.set_content(R"({"ok":false,"error":"task not found or not authorized"})", "application/json");
-        }
-    });
 
     // ---------------- 签到/打卡接口（真实数据库操作） ----------------
 

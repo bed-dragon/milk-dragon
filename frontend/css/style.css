@@ -562,6 +562,42 @@ tbody tr:hover {
   color: var(--text-muted);
 }
 
+/* ── 番茄钟计时器 ── */
+.pomodoro-timer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--space-xl) 0;
+}
+.pomodoro-clock {
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  border: 6px solid var(--primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  background: var(--primary-light);
+  transition: border-color 0.5s ease;
+}
+.pomodoro-time {
+  font-size: 42px;
+  font-weight: 700;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+.pomodoro-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+.pomodoro-controls {
+  display: flex;
+  gap: var(--space-md);
+}
+
 /* ── 表格斑马纹 ── */
 tbody tr:nth-child(even) {
   background: #f8f9fa;

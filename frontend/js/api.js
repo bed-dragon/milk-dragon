@@ -145,6 +145,32 @@ function markReminderRead(id) {
 }
 
 // ═══════════════════════════════════
+// 番茄钟 API
+// ═══════════════════════════════════
+
+/** 记录一次番茄钟 */
+function recordPomodoro(duration) {
+  return request('POST', '/api/pomodoro', { user_id: 1, duration: duration });
+}
+
+/** 获取今日番茄钟记录 → { records: [...] } */
+async function getTodayPomodoros() {
+  const data = await request('GET', '/api/pomodoro/today');
+  return { records: data.data || [] };
+}
+
+// ═══════════════════════════════════
+// 名言 API
+// ═══════════════════════════════════
+
+/** 获取随机名言 → { content, author } */
+async function getRandomQuote() {
+  const data = await request('GET', '/api/quotes/random');
+  const d = data.data || {};
+  return { content: d.content || '', author: d.author || '佚名' };
+}
+
+// ═══════════════════════════════════
 // 📦 模拟数据（后端就绪前使用）
 // ═══════════════════════════════════
 
@@ -216,4 +242,19 @@ const MOCK = {
       { id: 5, task_title: '阅读课外书 30 分钟', type: 'review', urgency: 'low', remind_date: '2026-07-08', is_read: 1 },
     ],
   },
+
+  // ── 番茄钟 ──
+  pomodoroToday: [],
+
+  // ── 名言 ──
+  quotes: [
+    { content: '学而不思则罔，思而不学则殆。', author: '孔子' },
+    { content: '天才是百分之一的灵感，加上百分之九十九的汗水。', author: '爱迪生' },
+    { content: '学习知识要善于思考，思考，再思考。', author: '爱因斯坦' },
+    { content: '千里之行，始于足下。', author: '老子' },
+    { content: '读书破万卷，下笔如有神。', author: '杜甫' },
+    { content: '知识就是力量。', author: '培根' },
+    { content: '活着就要学习，学习不是为了活着。', author: '培根' },
+    { content: '温故而知新，可以为师矣。', author: '孔子' },
+  ],
 };
