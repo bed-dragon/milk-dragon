@@ -23,7 +23,7 @@ sqlite3* open_db() {
     sqlite3* db = nullptr;
     // sqlite3_open 第一个参数是文件路径，第二个是输出指针
     // 成功返回 SQLITE_OK(0)，失败返回错误码
-    int rc = sqlite3_open("../data/study.db", &db);
+    int rc = sqlite3_open("data/study.db", &db);
     if (rc != SQLITE_OK) {
         // cerr 是标准错误输出，类似 cout 但专门打错误日志
         cerr << "[ERROR] 无法打开数据库: " << sqlite3_errmsg(db) << endl;
@@ -297,4 +297,45 @@ int task_create(int user_id, const Task& t) {
     sqlite3_finalize(stmt);
     sqlite3_close(db);
     return new_id;
+}
+
+// ============================================================
+// 5. task_get_list() — 查询任务列表
+// ============================================================
+// SELECT 跟 INSERT 的区别：
+//   - INSERT 用 sqlite3_step 执行一次就完
+//   - SELECT 用 while(sqlite3_step == SQLITE_ROW) 循环取每一行
+//   每行用 sqlite3_column_xxx 读字段值，拼成 JSON 数组返回
+// ============================================================
+
+string task_get_list(int user_id) {
+    sqlite3* db = open_db();
+    if (!db) return "[]";
+
+    const char* sql = "SELECT id, title, topic, deadline, priority, status, need_review FROM tasks WHERE user_id=? ORDER BY id DESC";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    sqlite3_bind_int(stmt, 1, user_id);
+
+    string result = "[";                          // JSON 数组开始
+    bool first = true;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {    // 逐行遍历结果
+        if (!first) result += ",";                // 不是第一个就加逗号
+        first = false;
+
+        result += "{";
+        result += "\"id\":"          + to_string(sqlite3_column_int(stmt, 0)) + ",";
+        result += "\"title\":\""     + string((const char*)sqlite3_column_text(stmt, 1)) + "\",";
+        result += "\"topic\":\""     + string((const char*)sqlite3_column_text(stmt, 2)) + "\",";
+        result += "\"deadline\":\""  + string((const char*)sqlite3_column_text(stmt, 3)) + "\",";
+        result += "\"priority\":"    + to_string(sqlite3_column_int(stmt, 4)) + ",";
+        result += "\"status\":"      + to_string(sqlite3_column_int(stmt, 5)) + ",";
+        result += "\"need_review\":" + to_string(sqlite3_column_int(stmt, 6));
+        result += "}";
+    }
+    result += "]";
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return result;                                // 返回 JSON 数组字符串
 }

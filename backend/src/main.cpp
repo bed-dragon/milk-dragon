@@ -1,6 +1,8 @@
 #define _WIN32_WINNT 0x0A00   // Windows 10+，httplib 编译需要
 #include "httplib.h"
 #include "db.h"
+#include "json.hpp"
+using json = nlohmann::json;
 
 using namespace httplib;
 using namespace std;
@@ -31,18 +33,44 @@ int main() {
         res.set_content(R"({"ok":true,"msg":"hello, 后端已启动!"})", "application/json");
     });
 
-    // ---------------- 任务接口（空壳） ----------------
+    // ---------------- 任务接口 ----------------
+    // GET /api/tasks?user_id=1  →  查询任务列表
     svr.Get("/api/tasks", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true,\"message\":\"list tasks (stub)\",\"data\":[]}", "application/json");
+        int user_id = stoi(req.get_param_value("user_id"));  // 从 URL 参数取 user_id
+        string data = task_get_list(user_id);                 // 调 db.cpp 查数据库
+        json resp;
+        resp["ok"] = true;
+        resp["data"] = json::parse(data);                    // 字符串转 JSON 数组
+        res.set_content(resp.dump(), "application/json");
     });
+
+    // POST /api/tasks  →  创建任务
     svr.Post("/api/tasks", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true,\"message\":\"create task (stub)\",\"data\":{\"id\":1}}", "application/json");
+        json body = json::parse(req.body);   // 解析前端发来的 JSON
+
+        Task t;                              // 装进 struct
+        t.title       = body["title"];
+        t.topic       = body.value("topic", "");
+        t.deadline    = body.value("deadline", "");
+        t.priority    = body.value("priority", 1);
+        t.need_review = body.value("need_review", false);
+
+        int new_id = task_create(body["user_id"], t);  // 写入数据库
+
+        json resp;
+        resp["ok"] = (new_id > 0);
+        resp["data"]["id"] = new_id;
+        res.set_content(resp.dump(), "application/json");
     });
+
+    // PUT /api/tasks/:id  →  编辑任务（暂留空壳）
     svr.Put(R"(/api/tasks/:id)", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true,\"message\":\"update task (stub)\",\"data\":{}}", "application/json");
+        res.set_content("{\"ok\":true,\"message\":\"update task (stub)\"}", "application/json");
     });
+
+    // DELETE /api/tasks/:id  →  删除任务（暂留空壳）
     svr.Delete(R"(/api/tasks/:id)", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true,\"message\":\"delete task (stub)\",\"data\":{}}", "application/json");
+        res.set_content("{\"ok\":true,\"message\":\"delete task (stub)\"}", "application/json");
     });
 
     // ---------------- 签到接口（空壳） ----------------
