@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学习养成计划 — 打卡</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <!-- 侧边栏 -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-icon">📚</span>
+      <span>学习养成计划</span>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" href="../index.html">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">仪表盘</span>
+      </a>
+      <a class="nav-item" href="tasks.html">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">任务管理</span>
+      </a>
+      <a class="nav-item active" href="checkin.html">
+        <span class="nav-icon">✅</span>
+        <span class="nav-label">打卡</span>
+      </a>
+      <a class="nav-item" href="stats.html">
+        <span class="nav-icon">📈</span>
+        <span class="nav-label">数据分析</span>
+      </a>
+      <a class="nav-item" href="reminders.html">
+        <span class="nav-icon">🔔</span>
+        <span class="nav-label">提醒中心</span>
+      </a>
+    </nav>
+  </aside>
+
+  <!-- 主区域 -->
+  <div class="main-wrapper">
+    <header class="topbar">
+      <h1 class="topbar-title">打卡</h1>
+      <div class="topbar-right">
+        <span class="topbar-date" id="currentDate"></span>
+      </div>
+    </header>
+
+    <main class="content">
+      <!-- 日期选择 -->
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:var(--space-md);flex-wrap:wrap;">
+          <label style="font-weight:500;">选择日期：</label>
+          <input class="form-input" type="date" id="checkinDate" style="width:auto;"
+                 onchange="loadCheckinData()">
+          <button class="btn btn-outline btn-sm" onclick="setDate(-1)">← 前一天</button>
+          <button class="btn btn-outline btn-sm" onclick="setDate(1)">后一天 →</button>
+          <button class="btn btn-sm btn-primary" onclick="setToday()">今天</button>
+        </div>
+      </div>
+
+      <!-- 今日任务打卡 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">📋 今日任务</h2>
+          <span id="todayProgress" style="font-size:var(--font-size-sm);color:var(--text-secondary);">0 / 0 已完成</span>
+        </div>
+        <div id="todayTasks">
+          <div class="empty-state">
+            <div class="empty-icon">📝</div>
+            <p>今天还没有任务，先去任务页面添加吧！</p>
+          </div>
+        </div>
+        <div style="margin-top:var(--space-md);">
+          <div class="progress">
+            <div class="progress-bar" id="progressBar" style="width:0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 打卡日历 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">📅 打卡日历</h2>
+          <div style="display:flex;gap:var(--space-sm);align-items:center;">
+            <button class="btn btn-outline btn-sm" onclick="prevMonth()">‹</button>
+            <span id="calendarTitle" style="font-weight:600;min-width:120px;text-align:center;"></span>
+            <button class="btn btn-outline btn-sm" onclick="nextMonth()">›</button>
+          </div>
+        </div>
+        <div id="calendar"></div>
+      </div>
+
+      <!-- 打卡记录列表 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">📄 打卡记录</h2>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>任务名称</th>
+                <th>打卡时间</th>
+                <th>日期</th>
+              </tr>
+            </thead>
+            <tbody id="checkinRecords">
+              <tr>
+                <td colspan="3" style="text-align:center;color:var(--text-muted);">
+                  暂无打卡记录
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/utils.js"></script>
+  <script src="../js/api.js"></script>
+  <script>
+    let currentMonth = new Date().getMonth();
+    let currentYear = new Date().getFullYear();
+    let checkinDates = new Set();
+
+    document.getElementById('currentDate').textContent = today();
+    document.getElementById('checkinDate').value = today();
+    loadCheckinData();
+    renderCalendar();
+
+    function setToday() {
+      document.getElementById('checkinDate').value = today();
+      loadCheckinData();
+    }
+
+    function setDate(offset) {
+      const input = document.getElementById('checkinDate');
+      const d = new Date(input.value + 'T00:00:00');
+      d.setDate(d.getDate() + offset);
+      input.value = formatDate(d);
+      loadCheckinData();
+    }
+
+    // 加载打卡数据
+    async function loadCheckinData() {
+      const date = document.getElementById('checkinDate').value;
+      try {
+        const [tasksData, checkinData] = await Promise.all([
+          getTasks(),
+          getCheckins(date)
+        ]);
+        renderTodayTasks(tasksData.tasks || [], checkinData.checkins || []);
+      } catch (e) {
+        renderTodayTasks(MOCK.tasks, MOCK.checkins[date] || []);
+      }
+    }
+
+    function renderTodayTasks(tasks, checkins) {
+      const container = document.getElementById('todayTasks');
+      const checkedIds = new Set(checkins.map(c => c.task_id));
+      const todayTasks = tasks.filter(t => t.status !== 1);
+
+      if (!todayTasks.length) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">📝</div><p>今天还没有任务，先去任务页面添加吧！</p></div>';
+        document.getElementById('todayProgress').textContent = '0 / 0 已完成';
+        document.getElementById('progressBar').style.width = '0%';
+        return;
+      }
+
+      const done = todayTasks.filter(t => checkedIds.has(t.id)).length;
+      const rate = Math.round((done / todayTasks.length) * 100);
+
+      document.getElementById('todayProgress').textContent = `${done} / ${todayTasks.length} 已完成`;
+      document.getElementById('progressBar').style.width = rate + '%';
+      document.getElementById('progressBar').className = 'progress-bar' + (rate === 100 ? ' success' : '');
+
+      container.innerHTML = todayTasks.map(t => {
+        const checked = checkedIds.has(t.id);
+        return `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);">
+            <div style="display:flex;align-items:center;gap:var(--space-sm);">
+              <span style="font-size:18px;">${checked ? '✅' : '⬜'}</span>
+              <div>
+                <strong style="${checked ? 'text-decoration:line-through;color:var(--text-muted);' : ''}">${t.title}</strong>
+                <span class="tag ${priorityClass(t.priority)}" style="margin-left:8px;">${priorityLabel(t.priority)}</span>
+              </div>
+            </div>
+            <div>
+              ${checked
+                ? '<span style="color:var(--success);font-size:var(--font-size-sm);">已打卡</span>'
+                : `<button class="btn btn-sm btn-success" onclick="doCheckin(${t.id})">打卡</button>`
+              }
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 打卡操作
+    async function doCheckin(taskId) {
+      const date = document.getElementById('checkinDate').value;
+      try {
+        await _doCheckin(taskId, date);
+        showToast('打卡成功！🎉', 'success');
+        checkinDates.add(date);
+        loadCheckinData();
+        renderCalendar();
+      } catch (e) {
+        if (!MOCK.checkins[date]) MOCK.checkins[date] = [];
+        MOCK.checkins[date].push({ id: Date.now(), task_id: taskId, checkin_date: date });
+        checkinDates.add(date);
+        loadCheckinData();
+        renderCalendar();
+        showToast('打卡成功！（模拟）🎉', 'success');
+      }
+    }
+
+    // ── 日历 ──
+    function renderCalendar() {
+      const title = document.getElementById('calendarTitle');
+      const grid = document.getElementById('calendar');
+      const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+
+      title.textContent = `${currentYear} 年 ${currentMonth + 1} 月`;
+
+      let html = '<div class="calendar-grid">';
+      weekDays.forEach(d => { html += `<div class="calendar-header">${d}</div>`; });
+
+      const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      const todayStr = today();
+
+      for (let i = 0; i < firstDay; i++) {
+        html += '<div></div>';
+      }
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const isToday = dateStr === todayStr;
+        const isChecked = checkinDates.has(dateStr);
+        html += `<div class="calendar-day${isToday ? ' today' : ''}${isChecked ? ' checked' : ''}">${d}</div>`;
+      }
+
+      html += '</div>';
+      grid.innerHTML = html;
+    }
+
+    function prevMonth() {
+      currentMonth--;
+      if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+      renderCalendar();
+    }
+
+    function nextMonth() {
+      currentMonth++;
+      if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+      renderCalendar();
+    }
+
+    // 加载打卡记录列表
+    async function loadCheckinRecords() {
+      const date = document.getElementById('checkinDate').value;
+      try {
+        const data = await getCheckins(date);
+        renderRecords(data.checkins || []);
+      } catch (e) {
+        renderRecords(MOCK.checkins[date] || []);
+      }
+    }
+
+    function renderRecords(records) {
+      const tbody = document.getElementById('checkinRecords');
+      if (!records.length) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);">暂无打卡记录</td></tr>';
+        return;
+      }
+      tbody.innerHTML = records.map(r => `
+        <tr>
+          <td>${r.task_title || '任务 #' + r.task_id}</td>
+          <td>${r.checkin_time || '-'}</td>
+          <td>${r.checkin_date}</td>
+        </tr>
+      `).join('');
+    }
+
+    // 日期变化时同时加载记录
+    const origLoad = loadCheckinData;
+    loadCheckinData = function() {
+      origLoad();
+      loadCheckinRecords();
+    };
+    loadCheckinRecords();
+  </script>
+</body>
+</html>
