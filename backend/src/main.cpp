@@ -1,6 +1,7 @@
 #define _WIN32_WINNT 0x0A00   // Windows 10+，httplib 编译需要
 #include "httplib.h"
 #include "db.h"
+#include "routes_tasks.h"
 
 using namespace httplib;
 using namespace std;
@@ -31,19 +32,12 @@ int main() {
         res.set_content(R"({"ok":true,"msg":"hello, 后端已启动!"})", "application/json");
     });
 
-    // ---------------- 任务接口（空壳） ----------------
-    svr.Get("/api/tasks", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true,\"message\":\"list tasks (stub)\",\"data\":[]}", "application/json");
-    });
-    svr.Post("/api/tasks", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true,\"message\":\"create task (stub)\",\"data\":{\"id\":1}}", "application/json");
-    });
-    svr.Put(R"(/api/tasks/:id)", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true,\"message\":\"update task (stub)\",\"data\":{}}", "application/json");
-    });
-    svr.Delete(R"(/api/tasks/:id)", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true,\"message\":\"delete task (stub)\",\"data\":{}}", "application/json");
-    });
+    // ---------------- 任务接口 ----------------
+    svr.Get("/api/tasks",              handle_get_tasks);
+    svr.Get(R"(/api/tasks/(\d+))",     handle_get_one_task);
+    svr.Post("/api/tasks",             handle_create_task);
+    svr.Put(R"(/api/tasks/(\d+))",     handle_update_task);
+    svr.Delete(R"(/api/tasks/(\d+))",  handle_delete_task);
 
     // ---------------- 签到接口（空壳） ----------------
     svr.Get("/api/checkin", [](const Request& req, Response& res) {
