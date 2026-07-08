@@ -12,25 +12,33 @@
  */
 
 const API_BASE = 'http://localhost:8080';
+const REQUEST_TIMEOUT = 2000; // 2 秒超时，快速降级到 MOCK
 
 /**
- * 通用请求函数
- * 返回后端完整 JSON 响应
+ * 通用请求函数（带超时）
  */
 async function request(method, path, body = null) {
-  const options = {
-    method: method,
-    headers: { 'Content-Type': 'application/json' },
-  };
-  if (body) options.body = JSON.stringify(body);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
-  const res = await fetch(API_BASE + path, options);
-  const data = await res.json();
+  try {
+    const options = {
+      method: method,
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+    };
+    if (body) options.body = JSON.stringify(body);
 
-  if (!data.ok && data.ok !== undefined) {
-    throw new Error(data.error || '请求失败');
+    const res = await fetch(API_BASE + path, options);
+    const data = await res.json();
+
+    if (!data.ok && data.ok !== undefined) {
+      throw new Error(data.error || '请求失败');
+    }
+    return data;
+  } finally {
+    clearTimeout(timeout);
   }
-  return data;
 }
 
 // ═══════════════════════════════════

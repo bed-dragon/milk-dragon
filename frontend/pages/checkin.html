@@ -120,6 +120,7 @@
 
   <script src="../js/utils.js"></script>
   <script src="../js/api.js"></script>
+  <script src="../js/navigation.js"></script>
   <script>
     let currentMonth = new Date().getMonth();
     let currentYear = new Date().getFullYear();
@@ -143,18 +144,18 @@
       loadCheckinData();
     }
 
-    // 加载打卡数据
+    // 加载打卡数据（先展示 MOCK，再请求后端）
     async function loadCheckinData() {
       const date = document.getElementById('checkinDate').value;
+      const mockCheckins = MOCK.checkins[date] || [];
+      renderTodayTasks(MOCK.tasks, mockCheckins);
       try {
         const [tasksData, checkinData] = await Promise.all([
           getTasks(),
           getCheckins(date)
         ]);
         renderTodayTasks(tasksData.tasks || [], checkinData.checkins || []);
-      } catch (e) {
-        renderTodayTasks(MOCK.tasks, MOCK.checkins[date] || []);
-      }
+      } catch (e) { /* MOCK 已在展示 */ }
     }
 
     function renderTodayTasks(tasks, checkins) {
@@ -174,7 +175,8 @@
 
       document.getElementById('todayProgress').textContent = `${done} / ${todayTasks.length} 已完成`;
       document.getElementById('progressBar').style.width = rate + '%';
-      document.getElementById('progressBar').className = 'progress-bar' + (rate === 100 ? ' success' : '');
+      const barClass = rate === 100 ? ' success' : rate >= 50 ? ' warning' : '';
+      document.getElementById('progressBar').className = 'progress-bar' + barClass;
 
       container.innerHTML = todayTasks.map(t => {
         const checked = checkedIds.has(t.id);

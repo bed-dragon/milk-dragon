@@ -115,21 +115,180 @@
 
   <script src="js/utils.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/navigation.js"></script>
   <script>
-    // 显示当前日期
     document.getElementById('currentDate').textContent = today();
 
-    // 加载首页数据（后续对接真实接口）
+    // ═══════════════════════════════════
+    // 仪表盘数据加载（先展示 MOCK，再尝试请求后端）
+    // ═══════════════════════════════════
     async function loadDashboard() {
+      // 先展示 MOCK 数据，秒开
+      const allReminders = [...(MOCK.reminders.due || []), ...(MOCK.reminders.review || [])];
+      renderOverview(MOCK.overview);
+      renderReminders(allReminders);
+      renderRecentTasks(MOCK.tasks);
+      checkReminderNotification(allReminders);
+
+      // 同时尝试请求后端，成功后无缝更新
       try {
-        // TODO: 对接真实接口后取消注释
-        // const overview = await getOverview();
-        // const reminders = await getReminders();
-        // const tasks = await getTasks();
+        const [overview, reminders, tasks] = await Promise.all([
+          getOverview(),
+          getReminders(),
+          getTasks()
+        ]);
+        renderOverview(overview);
+        renderReminders(reminders.reminders || []);
+        renderRecentTasks(tasks.tasks || []);
+        checkReminderNotification(reminders.reminders || []);
       } catch (e) {
-        console.log('等待后端接口就绪，当前使用模拟数据');
+        // MOCK 数据已经在展示，无需处理
       }
     }
+
+    // ── 统计总览 ──
+    function renderOverview(data) {
+      document.getElementById('totalTasks').textContent = data.total_tasks || 0;
+      document.getElementById('completedTasks').textContent = data.completed || 0;
+      document.getElementById('completionRate').textContent = calcRate(data.completed, data.total_tasks) + '%';
+      document.getElementById('streakDays').textContent = data.streak || 0;
+    }
+
+    // ── 今日提醒 ──
+    function renderReminders(reminders) {
+      const container = document.getElementById('todayReminders');
+      const unread = reminders.filter(r => !r.is_read);
+
+      if (!unread.length) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">🎉</div>
+            <p>暂无提醒，今天继续加油！</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = unread.slice(0, 5).map(r => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:var(--space-sm);">
+            <span>${r.type === 'due' ? '⏰' : '📖'}</span>
+            <div>
+              <strong>${r.task_title}</strong>
+              <span class="tag ${urgencyClass(r.urgency)}" style="margin-left:6px;">${urgencyLabel(r.urgency)}</span>
+            </div>
+          </div>
+          <a href="pages/reminders.html" class="btn btn-sm btn-outline">查看</a>
+        </div>
+      `).join('');
+
+      if (unread.length > 5) {
+        container.innerHTML += `
+          <div style="text-align:center;padding:8px 0;color:var(--text-muted);font-size:var(--font-size-sm);">
+            还有 ${unread.length - 5} 条提醒...
+          </div>`;
+      }
+    }
+
+    // ── 近期任务 ──
+    function renderRecentTasks(tasks) {
+      const tbody = document.getElementById('recentTasks');
+      const recent = tasks.slice(0, 5);
+
+      if (!recent.length) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="4" style="text-align:center;color:var(--text-muted);">
+              暂无任务，快去创建一个吧！
+            </td>
+          </tr>`;
+        return;
+      }
+
+      tbody.innerHTML = recent.map(t => `
+        <tr>
+          <td><strong>${t.title}</strong></td>
+          <td>${t.deadline ? formatDateTime(t.deadline) : '无截止'}</td>
+          <td><span class="tag ${priorityClass(t.priority)}">${priorityLabel(t.priority)}</span></td>
+          <td>${t.status ? '<span class="tag tag-success">已完成</span>' : '<span style="color:var(--text-secondary);">进行中</span>'}</td>
+        </tr>
+      `).join('');
+    }
+
+    // ── 提醒弹窗通知 ──
+    function checkReminderNotification(reminders) {
+      const unread = reminders.filter(r => !r.is_read);
+      if (!unread.length) return;
+
+      // 页面右下角浮窗通知
+      setTimeout(() => {
+        const count = unread.length;
+        const container = document.createElement('div');
+        container.style.cssText = `
+          position: fixed;
+          bottom: 24px;
+          right: 24px;
+          background: var(--bg-card);
+          border-radius: var(--radius-md);
+          box-shadow: var(--shadow-lg);
+          padding: 16px 20px;
+          z-index: 9999;
+          max-width: 360px;
+          border-left: 4px solid var(--warning);
+          animation: slideUp 0.4s ease;
+          cursor: pointer;
+        `;
+        container.innerHTML = `
+          <div style="display:flex;align-items:flex-start;gap:12px;">
+            <span style="font-size:24px;">🔔</span>
+            <div>
+              <div style="font-weight:600;font-size:var(--font-size-base);">您有 ${count} 条待处理提醒</div>
+              <div style="font-size:var(--font-size-sm);color:var(--text-secondary);margin-top:4px;">
+                ${unread.slice(0, 3).map(r => r.task_title).join('、')}${count > 3 ? ' 等' : ''}
+              </div>
+              <a href="pages/reminders.html" style="display:inline-block;margin-top:8px;font-size:var(--font-size-sm);">查看详情 →</a>
+            </div>
+            <button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;font-size:18px;cursor:pointer;padding:0;color:var(--text-muted);">×</button>
+          </div>
+        `;
+        container.addEventListener('click', (e) => {
+          if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'A') {
+            window.location.href = 'pages/reminders.html';
+          }
+        });
+        document.body.appendChild(container);
+
+        // 8 秒后自动消失
+        setTimeout(() => {
+          if (container.parentNode) {
+            container.style.opacity = '0';
+            container.style.transition = 'opacity 0.5s ease';
+            setTimeout(() => container.remove(), 500);
+          }
+        }, 8000);
+
+        // 桌面通知（需用户授权）
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('学习养成计划', {
+            body: `您有 ${count} 条待处理提醒`,
+            icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📚</text></svg>'
+          });
+        } else if ('Notification' in window && Notification.permission === 'default') {
+          Notification.requestPermission();
+        }
+      }, 1000);
+    }
+
+    // ── 追加 slideUp 动画 ──
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = `
+      @keyframes slideUp {
+        from { transform: translateY(20px); opacity: 0; }
+        to   { transform: translateY(0);    opacity: 1; }
+      }
+    `;
+    document.head.appendChild(styleSheet);
+
+    // 启动
     loadDashboard();
   </script>
 </body>
