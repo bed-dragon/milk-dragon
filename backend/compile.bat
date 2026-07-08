@@ -21,6 +21,7 @@ g++ -std=c++17 ^
     -fexec-charset=GBK ^
     src/main.cpp ^
     src/db.cpp ^
+    src/routes_tasks.cpp ^
     sqlite3.o ^
     -lws2_32 ^
     -o server.exe

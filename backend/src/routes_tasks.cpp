@@ -44,7 +44,8 @@ void handle_create_task(const Request& req, Response& res) {
     t.priority    = body.value("priority", 1);
     t.need_review = body.value("need_review", false);
 
-    int new_id = task_create(body["user_id"], t);
+    int user_id = body.value("user_id", 1);  // 登录做好前默认用1
+    int new_id = task_create(user_id, t);
 
     json resp;
     resp["ok"] = (new_id > 0);
@@ -65,7 +66,8 @@ void handle_update_task(const Request& req, Response& res) {
     t.status      = body.value("status", 0);
     t.need_review = body.value("need_review", false);
 
-    bool ok = task_update(task_id, body["user_id"], t);
+    int user_id = body.value("user_id", 1);
+    bool ok = task_update(task_id, user_id, t);
 
     json resp;
     resp["ok"] = ok;
