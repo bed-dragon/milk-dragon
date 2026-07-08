@@ -6,12 +6,16 @@
  * 1. 后端未就绪时，页面使用 MOCK 数据自动展示
  * 2. 后端接口完成后，函数会自动请求真实接口
  * 3. 如果请求失败，自动降级到模拟数据
+ *
+ * 响应格式约定：后端统一返回 { ok: true/false, data: ... }
+ * 每个 wrapper 函数负责解包 data 字段，返回页面期望的格式
  */
 
 const API_BASE = 'http://localhost:8080';
 
 /**
  * 通用请求函数
+ * 返回后端完整 JSON 响应
  */
 async function request(method, path, body = null) {
   const options = {
@@ -33,8 +37,10 @@ async function request(method, path, body = null) {
 // 任务 API
 // ═══════════════════════════════════
 
-function getTasks() {
-  return request('GET', '/api/tasks');
+/** 获取任务列表 → { tasks: [...] } */
+async function getTasks() {
+  const data = await request('GET', '/api/tasks');
+  return { tasks: data.data || [] };
 }
 
 function createTask(task) {
@@ -49,8 +55,10 @@ function _deleteTask(id) {
   return request('DELETE', `/api/tasks/${id}`);
 }
 
-function getRecommended() {
-  return request('GET', '/api/tasks/recommended');
+/** 获取推荐任务 → { tasks: [...] } */
+async function getRecommended() {
+  const data = await request('GET', '/api/recommended_tasks');
+  return { tasks: data.data || [] };
 }
 
 // ═══════════════════════════════════
@@ -61,48 +69,71 @@ function _doCheckin(taskId, date) {
   return request('POST', '/api/checkin', { task_id: taskId, date: date });
 }
 
-function getCheckins(dateOrTaskId) {
-  // 判断传入的是日期还是 task_id
+/** 查询打卡记录 → { checkins: [...] } */
+async function getCheckins(dateOrTaskId) {
+  let data;
   if (typeof dateOrTaskId === 'number' || /^\d+$/.test(dateOrTaskId)) {
-    return request('GET', `/api/checkin?task_id=${dateOrTaskId}`);
+    data = await request('GET', `/api/checkin?task_id=${dateOrTaskId}`);
+  } else {
+    data = await request('GET', `/api/checkin?date=${dateOrTaskId}`);
   }
-  return request('GET', `/api/checkin?date=${dateOrTaskId}`);
+  return { checkins: data.data || [] };
 }
 
-function getStreak() {
-  return request('GET', '/api/checkin/streak');
+/** 获取连续打卡天数 → { streak: N } */
+async function getStreak() {
+  const data = await request('POST', '/api/signins', { user_id: 1, date: today() });
+  const inner = data.data || {};
+  return { streak: inner.streak || 0 };
 }
 
 // ═══════════════════════════════════
 // 统计分析 API
 // ═══════════════════════════════════
 
-function getOverview() {
-  return request('GET', '/api/stats/overview');
+/** 获取总览统计 → { total_tasks, completed, rate, streak } */
+async function getOverview() {
+  const data = await request('GET', '/api/stats/overview');
+  const d = data.data || {};
+  return {
+    total_tasks: d.total_tasks || 0,
+    completed: d.completed || 0,
+    rate: d.completion_rate || d.rate || 0,
+    streak: d.streak || 0,
+  };
 }
 
-function getDailyStats(start, end) {
-  return request('GET', `/api/stats/daily?start=${start}&end=${end}`);
+/** 获取每日统计 → { daily: [...] } */
+async function getDailyStats(start, end) {
+  const data = await request('GET', `/api/stats/daily?start=${start}&end=${end}`);
+  return { daily: data.data || [] };
 }
 
-function getWeeklyStats(week) {
-  return request('GET', `/api/stats/weekly?week=${week}`);
+/** 获取每周统计 → { daily: [...] } */
+async function getWeeklyStats(week) {
+  const data = await request('GET', `/api/stats/weekly?week=${week}`);
+  return { daily: data.data || [] };
 }
 
-function getMonthlyStats(month) {
-  return request('GET', `/api/stats/monthly?month=${month}`);
+/** 获取每月统计 → { daily: [...] } */
+async function getMonthlyStats(month) {
+  const data = await request('GET', `/api/stats/monthly?month=${month}`);
+  return { daily: data.data || [] };
 }
 
 // ═══════════════════════════════════
 // 提醒 API
 // ═══════════════════════════════════
 
-function getReminders(type = '') {
-  return request('GET', `/api/reminders?type=${type}`);
+/** 获取提醒列表 → { reminders: [...] } */
+async function getReminders(type = '') {
+  const data = await request('GET', `/api/reminders?type=${type}`);
+  return { reminders: data.data || [] };
 }
 
+/** 标记提醒已读 */
 function markReminderRead(id) {
-  return request('PUT', `/api/reminders/${id}/read`);
+  return request('POST', '/api/reminders/mark_read', { reminder_id: id, user_id: 1 });
 }
 
 // ═══════════════════════════════════

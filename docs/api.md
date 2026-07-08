@@ -268,6 +268,42 @@
 
 ---
 
+### GET /api/stats/weekly
+- 方法：GET
+- 路径：`/api/stats/weekly`
+- Query：`user_id`, `week`（周起始日期，格式 YYYY-MM-DD）
+- 返回示例：
+```json
+{ "ok": true, "data": [{ "date":"07-01", "added":3, "completed":2, "rate":0.67 }] }
+```
+
+### GET /api/stats/monthly
+- 方法：GET
+- 路径：`/api/stats/monthly`
+- Query：`user_id`, `month`（月份，格式 YYYY-MM）
+- 返回示例：
+```json
+{ "ok": true, "data": [{ "date":"07-01", "added":3, "completed":2, "rate":0.67 }] }
+```
+
+---
+
+## 13. 补充接口
+
+### GET /api/checkin/streak
+- 方法：GET
+- 路径：`/api/checkin/streak`
+- Query：可选 `user_id`
+- 返回示例：
+```json
+{ "ok": true, "data": { "streak": 5 } }
+```
+
+### GET /api/checkin
+- 补充说明：Query 参数除 `user_id`、`date` 外，还支持 `task_id`（数字），用于按任务 ID 查询打卡记录。
+
+---
+
 备注：文档为草稿，下一步可以：
 - 为每个接口补充请求/响应字段说明和示例（按需展开）；
 - 添加鉴权（`Authorization: Bearer <token>`）示例；
