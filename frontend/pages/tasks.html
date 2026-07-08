@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学习养成计划 — 任务管理</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <!-- 侧边栏 -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-icon">📚</span>
+      <span>学习养成计划</span>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" href="../index.html">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">仪表盘</span>
+      </a>
+      <a class="nav-item active" href="tasks.html">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">任务管理</span>
+      </a>
+      <a class="nav-item" href="checkin.html">
+        <span class="nav-icon">✅</span>
+        <span class="nav-label">打卡</span>
+      </a>
+      <a class="nav-item" href="stats.html">
+        <span class="nav-icon">📈</span>
+        <span class="nav-label">数据分析</span>
+      </a>
+      <a class="nav-item" href="reminders.html">
+        <span class="nav-icon">🔔</span>
+        <span class="nav-label">提醒中心</span>
+      </a>
+    </nav>
+  </aside>
+
+  <!-- 主区域 -->
+  <div class="main-wrapper">
+    <header class="topbar">
+      <h1 class="topbar-title">任务管理</h1>
+      <div class="topbar-right">
+        <span class="topbar-date" id="currentDate"></span>
+      </div>
+    </header>
+
+    <main class="content">
+      <!-- 添加/编辑任务卡片 -->
+      <div class="card" id="taskFormCard">
+        <div class="card-header">
+          <h2 class="card-title" id="formTitle">📝 添加新任务</h2>
+          <button class="btn btn-outline btn-sm" id="cancelEdit" style="display:none;" onclick="cancelEdit()">取消编辑</button>
+        </div>
+        <form id="taskForm" onsubmit="handleTaskSubmit(event)">
+          <div class="form-group">
+            <label class="form-label" for="taskTitle">任务标题 *</label>
+            <input class="form-input" type="text" id="taskTitle" placeholder="输入任务名称..." required>
+          </div>
+          <div style="display:flex;gap:var(--space-md);flex-wrap:wrap;">
+            <div class="form-group" style="flex:1;min-width:180px;">
+              <label class="form-label" for="taskDeadline">截止时间</label>
+              <input class="form-input" type="datetime-local" id="taskDeadline">
+            </div>
+            <div class="form-group" style="flex:1;min-width:150px;">
+              <label class="form-label" for="taskPriority">优先级</label>
+              <select class="form-select" id="taskPriority">
+                <option value="2">中优先级</option>
+                <option value="1">高优先级</option>
+                <option value="3">低优先级</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex:1;min-width:150px;">
+              <label class="form-label" for="taskTopic">主题分类</label>
+              <input class="form-input" type="text" id="taskTopic" placeholder="如：英语、编程...">
+            </div>
+          </div>
+          <div class="form-group">
+            <label style="display:flex;align-items:center;gap:var(--space-sm);cursor:pointer;">
+              <input type="checkbox" id="taskNeedReview">
+              <span style="font-size:var(--font-size-sm);color:var(--text-secondary);">需要复习提醒（打卡后第 1、2、4、7 天提醒复习）</span>
+            </label>
+          </div>
+          <button type="submit" class="btn btn-primary" id="submitBtn">添加任务</button>
+        </form>
+      </div>
+
+      <!-- 系统推荐任务 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">⭐ 系统推荐任务</h2>
+          <button class="btn btn-outline btn-sm" onclick="loadRecommended()">刷新推荐</button>
+        </div>
+        <div id="recommendedList">
+          <div class="empty-state">
+            <div class="empty-icon">💡</div>
+            <p>加载推荐任务中...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 任务列表 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">📋 所有任务</h2>
+          <button class="btn btn-outline btn-sm" onclick="loadTasks()">🔄 刷新</button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>任务名称</th>
+                <th>主题</th>
+                <th>截止时间</th>
+                <th>优先级</th>
+                <th>复习</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="taskList">
+              <tr>
+                <td colspan="7" style="text-align:center;color:var(--text-muted);">
+                  暂无任务
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/utils.js"></script>
+  <script src="../js/api.js"></script>
+  <script>
+    let editingId = null;
+
+    document.getElementById('currentDate').textContent = today();
+
+    // 加载任务列表
+    async function loadTasks() {
+      try {
+        const data = await getTasks();
+        renderTasks(data.tasks || []);
+      } catch (e) {
+        console.log('使用模拟数据');
+        renderTasks(MOCK.tasks);
+      }
+    }
+
+    function renderTasks(tasks) {
+      const tbody = document.getElementById('taskList');
+      if (!tasks.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">暂无任务</td></tr>';
+        return;
+      }
+      tbody.innerHTML = tasks.map(t => `
+        <tr>
+          <td><strong>${t.title}</strong></td>
+          <td>${t.topic || '-'}</td>
+          <td>${t.deadline ? formatDateTime(t.deadline) : '无截止'}</td>
+          <td><span class="tag ${priorityClass(t.priority)}">${priorityLabel(t.priority)}</span></td>
+          <td>${t.need_review ? '<span class="tag tag-review">需要</span>' : '-'}</td>
+          <td>${t.status ? '<span class="tag tag-success">已完成</span>' : '进行中'}</td>
+          <td>
+            <button class="btn btn-sm btn-outline" onclick="editTask(${t.id})">编辑</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteTask(${t.id})">删除</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // 提交任务表单
+    async function handleTaskSubmit(e) {
+      e.preventDefault();
+      const task = {
+        title: document.getElementById('taskTitle').value.trim(),
+        deadline: document.getElementById('taskDeadline').value || '',
+        priority: parseInt(document.getElementById('taskPriority').value),
+        topic: document.getElementById('taskTopic').value.trim(),
+        need_review: document.getElementById('taskNeedReview').checked ? 1 : 0
+      };
+
+      if (!task.title) {
+        showToast('请输入任务标题', 'warning');
+        return;
+      }
+
+      try {
+        if (editingId) {
+          await updateTask(editingId, task);
+          showToast('任务已更新！', 'success');
+        } else {
+          await createTask(task);
+          showToast('任务创建成功！', 'success');
+        }
+        resetForm();
+        loadTasks();
+      } catch (e) {
+        showToast('操作失败：' + e.message, 'error');
+        // 模拟模式
+        if (editingId) {
+          const idx = MOCK.tasks.findIndex(t => t.id === editingId);
+          if (idx >= 0) Object.assign(MOCK.tasks[idx], task);
+        } else {
+          MOCK.tasks.push({ id: Date.now(), ...task, status: 0, created_at: new Date().toISOString() });
+        }
+        resetForm();
+        renderTasks(MOCK.tasks);
+        showToast(editingId ? '任务已更新！（模拟）' : '任务创建成功！（模拟）', 'success');
+      }
+    }
+
+    // 编辑任务
+    function editTask(id) {
+      const tasks = window._tasks || MOCK.tasks;
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+      editingId = id;
+      document.getElementById('formTitle').textContent = '✏️ 编辑任务';
+      document.getElementById('submitBtn').textContent = '保存修改';
+      document.getElementById('cancelEdit').style.display = 'inline-flex';
+      document.getElementById('taskTitle').value = task.title;
+      document.getElementById('taskDeadline').value = task.deadline || '';
+      document.getElementById('taskPriority').value = task.priority || 2;
+      document.getElementById('taskTopic').value = task.topic || '';
+      document.getElementById('taskNeedReview').checked = task.need_review === 1;
+    }
+
+    function cancelEdit() {
+      resetForm();
+    }
+
+    function resetForm() {
+      editingId = null;
+      document.getElementById('taskForm').reset();
+      document.getElementById('formTitle').textContent = '📝 添加新任务';
+      document.getElementById('submitBtn').textContent = '添加任务';
+      document.getElementById('cancelEdit').style.display = 'none';
+    }
+
+    // 删除任务
+    async function deleteTask(id) {
+      if (!confirm('确定要删除这个任务吗？')) return;
+      try {
+        await _deleteTask(id);
+        showToast('任务已删除', 'success');
+        loadTasks();
+      } catch (e) {
+        const idx = MOCK.tasks.findIndex(t => t.id === id);
+        if (idx >= 0) MOCK.tasks.splice(idx, 1);
+        renderTasks(MOCK.tasks);
+        showToast('任务已删除（模拟）', 'success');
+      }
+    }
+
+    // 推荐任务
+    async function loadRecommended() {
+      const el = document.getElementById('recommendedList');
+      try {
+        const data = await getRecommended();
+        renderRecommended(data.tasks || []);
+      } catch (e) {
+        renderRecommended(MOCK.recommended);
+      }
+    }
+
+    function renderRecommended(tasks) {
+      const el = document.getElementById('recommendedList');
+      if (!tasks.length) {
+        el.innerHTML = '<div class="empty-state"><p>暂无推荐任务</p></div>';
+        return;
+      }
+      el.innerHTML = tasks.map(t => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+          <div>
+            <strong>${t.title}</strong>
+            ${t.topic ? `<span class="tag tag-review" style="margin-left:8px;">${t.topic}</span>` : ''}
+          </div>
+          <button class="btn btn-sm btn-primary" onclick="quickAdd('${t.title}', '${t.topic || ''}', ${t.priority})">+ 添加</button>
+        </div>
+      `).join('');
+    }
+
+    function quickAdd(title, topic, priority) {
+      document.getElementById('taskTitle').value = title;
+      document.getElementById('taskTopic').value = topic;
+      document.getElementById('taskPriority').value = priority;
+      document.getElementById('taskDeadline').focus();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // 初始化
+    loadTasks();
+    loadRecommended();
+  </script>
+</body>
+</html>

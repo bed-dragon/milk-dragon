@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学习养成计划 — 首页</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- 侧边栏 -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-icon">📚</span>
+      <span>学习养成计划</span>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item active" href="index.html">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">仪表盘</span>
+      </a>
+      <a class="nav-item" href="pages/tasks.html">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">任务管理</span>
+      </a>
+      <a class="nav-item" href="pages/checkin.html">
+        <span class="nav-icon">✅</span>
+        <span class="nav-label">打卡</span>
+      </a>
+      <a class="nav-item" href="pages/stats.html">
+        <span class="nav-icon">📈</span>
+        <span class="nav-label">数据分析</span>
+      </a>
+      <a class="nav-item" href="pages/reminders.html">
+        <span class="nav-icon">🔔</span>
+        <span class="nav-label">提醒中心</span>
+      </a>
+    </nav>
+  </aside>
+
+  <!-- 主区域 -->
+  <div class="main-wrapper">
+    <header class="topbar">
+      <h1 class="topbar-title">仪表盘</h1>
+      <div class="topbar-right">
+        <span class="topbar-date" id="currentDate"></span>
+      </div>
+    </header>
+
+    <main class="content">
+      <!-- 统计概览 -->
+      <div class="stat-grid" id="overviewStats">
+        <div class="stat-card">
+          <div class="stat-icon">📋</div>
+          <div class="stat-value" id="totalTasks">0</div>
+          <div class="stat-label">总任务数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">✅</div>
+          <div class="stat-value" id="completedTasks">0</div>
+          <div class="stat-label">已完成</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📈</div>
+          <div class="stat-value" id="completionRate">0%</div>
+          <div class="stat-label">完成率</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🔥</div>
+          <div class="stat-value" id="streakDays">0</div>
+          <div class="stat-label">连续打卡天数</div>
+        </div>
+      </div>
+
+      <!-- 今日提醒 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">🔔 今日提醒</h2>
+        </div>
+        <div id="todayReminders">
+          <div class="empty-state">
+            <div class="empty-icon">🎉</div>
+            <p>暂无提醒，今天继续加油！</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 近期任务 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">📋 近期任务</h2>
+          <a href="pages/tasks.html" class="btn btn-outline btn-sm">查看全部</a>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>任务名称</th>
+                <th>截止时间</th>
+                <th>优先级</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody id="recentTasks">
+              <tr>
+                <td colspan="4" style="text-align:center;color:var(--text-muted);">
+                  暂无任务，快去创建一个吧！
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
+  <script>
+    // 显示当前日期
+    document.getElementById('currentDate').textContent = today();
+
+    // 加载首页数据（后续对接真实接口）
+    async function loadDashboard() {
+      try {
+        // TODO: 对接真实接口后取消注释
+        // const overview = await getOverview();
+        // const reminders = await getReminders();
+        // const tasks = await getTasks();
+      } catch (e) {
+        console.log('等待后端接口就绪，当前使用模拟数据');
+      }
+    }
+    loadDashboard();
+  </script>
+</body>
+</html>
