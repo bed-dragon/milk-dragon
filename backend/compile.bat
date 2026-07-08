@@ -1,6 +1,5 @@
 @echo off
 cd /d %~dp0
-taskkill /F /IM server.exe >nul 2>&1
 
 echo ========================================
 echo  Build backend
@@ -22,10 +21,8 @@ if %errorlevel% neq 0 (
 echo [2/2] Compiling C++ and linking...
 g++ -std=c++17 ^
     -Isrc -Ilibs ^
-    -fexec-charset=GBK ^
     src/main.cpp ^
     src/db.cpp ^
-    src/routes_tasks.cpp ^
     src/routes_tasks.cpp ^
     sqlite3.o ^
     -lws2_32 ^

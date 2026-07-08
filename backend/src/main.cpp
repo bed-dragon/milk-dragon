@@ -302,15 +302,17 @@ int main() {
 
     // ---------------- 名言（Quotes） ----------------
     svr.Get("/api/quotes/random", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true,\"data\":{\"content\":\"学习使人进步\",\"author\":\"佚名\"}}", "application/json");
+        string data_str = quote_random();
+        json resp = {{"ok", true}, {"data", json::parse(data_str)}};
+        res.set_content(resp.dump(), "application/json");
     });
 
     // 5. 关掉 httplib 自带的日志
     svr.set_logger(nullptr);
 
     // 6. 启动服务器
-    cout << "服务器启动: http://localhost:8080" << endl;
-    cout << "测试接口: http://localhost:8080/api/hello" << endl;
+    cout << "Server: http://localhost:8080" << endl;
+    cout << "Test:   http://localhost:8080/api/hello" << endl;
     svr.listen("0.0.0.0", 8080);
 
     return 0;

@@ -168,7 +168,7 @@ void init_tables() {
         );
     )");
 
-    // 10. 名言表
+    // 11. 名言表（含种子数据）
     exec_sql(db, R"(
         CREATE TABLE IF NOT EXISTS quotes (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -178,7 +178,21 @@ void init_tables() {
         );
     )");
 
-    // 11. 推荐任务表
+    // 插入种子名言（IGNORE 保证重复运行不会重复插入）
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(1,'学习使人进步','佚名');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(2,'千里之行，始于足下','老子');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(3,'学而不思则罔，思而不学则殆','孔子');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(4,'天道酬勤','《周易》');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(5,'书山有路勤为径，学海无涯苦作舟','韩愈');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(6,'不积跬步，无以至千里','荀子');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(7,'业精于勤，荒于嬉','韩愈');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(8,'少壮不努力，老大徒伤悲','《乐府诗集》');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(9,'有志者，事竟成','《后汉书》');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(10,'知识就是力量','培根');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(11,'温故而知新，可以为师矣','孔子');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(12,'锲而不舍，金石可镂','荀子');");
+
+    // 12. 推荐任务表（含种子数据）
     exec_sql(db, R"(
         CREATE TABLE IF NOT EXISTS recommended_tasks (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -189,8 +203,17 @@ void init_tables() {
         );
     )");
 
+    exec_sql(db, "INSERT OR IGNORE INTO recommended_tasks(id,title,topic,priority) VALUES(1,'背30个英语单词','英语',2);");
+    exec_sql(db, "INSERT OR IGNORE INTO recommended_tasks(id,title,topic,priority) VALUES(2,'复习当天课程笔记','学习方法',1);");
+    exec_sql(db, "INSERT OR IGNORE INTO recommended_tasks(id,title,topic,priority) VALUES(3,'阅读课外书30分钟','阅读',3);");
+    exec_sql(db, "INSERT OR IGNORE INTO recommended_tasks(id,title,topic,priority) VALUES(4,'完成LeetCode每日一题','编程',2);");
+    exec_sql(db, "INSERT OR IGNORE INTO recommended_tasks(id,title,topic,priority) VALUES(5,'整理课程思维导图','学习方法',2);");
+    exec_sql(db, "INSERT OR IGNORE INTO recommended_tasks(id,title,topic,priority) VALUES(6,'练习听力20分钟','英语',2);");
+    exec_sql(db, "INSERT OR IGNORE INTO recommended_tasks(id,title,topic,priority) VALUES(7,'写学习日记','学习方法',3);");
+    exec_sql(db, "INSERT OR IGNORE INTO recommended_tasks(id,title,topic,priority) VALUES(8,'运动30分钟','健康',3);");
+
     sqlite3_close(db);
-    cout << "[OK] 数据库初始化完成，所有表已就绪" << endl;
+    cout << "[OK] Database initialized, all tables ready" << endl;
 }
 
 // ============================================================
@@ -846,4 +869,23 @@ bool   material_delete(int, int)                          { return false; }
 bool   pomodoro_record(int, int)                          { return false; }
 string pomodoro_today(int)                                { return "[]"; }
 // 名言
-string quote_random()                                     { return "{}"; }
+string quote_random() {
+    sqlite3* db = open_db();
+    if (!db) return "{}";
+
+    json obj = {{"content", "学无止境"}, {"author", "佚名"}};
+
+    sqlite3_stmt* stmt = nullptr;
+    // ORDER BY RANDOM() 随机取一条
+    const char* sql = "SELECT content, author FROM quotes ORDER BY RANDOM() LIMIT 1;";
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            obj["content"] = (const char*)sqlite3_column_text(stmt, 0);
+            obj["author"]  = (const char*)sqlite3_column_text(stmt, 1);
+        }
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return obj.dump();
+}
