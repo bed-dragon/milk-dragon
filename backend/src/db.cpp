@@ -25,10 +25,13 @@ sqlite3* open_db() {
     // 成功返回 SQLITE_OK(0)，失败返回错误码
     int rc = sqlite3_open("data/study.db", &db);
     if (rc != SQLITE_OK) {
-        // cerr 是标准错误输出，类似 cout 但专门打错误日志
         cerr << "[ERROR] 无法打开数据库: " << sqlite3_errmsg(db) << endl;
         return nullptr;
     }
+    // 被锁时等待最多5秒，而不是立即报错
+    sqlite3_busy_timeout(db, 5000);
+    // WAL 模式：读写不互斥，适合多线程 HTTP 服务器
+    sqlite3_exec(db, "PRAGMA journal_mode=WAL;", 0, 0, 0);
     return db;
 }
 
@@ -292,6 +295,9 @@ int task_create(int user_id, const Task& t) {
     sqlite3_bind_int(stmt,  6, t.need_review ? 1 : 0);
 
     int ok = sqlite3_step(stmt);
+    if (ok != SQLITE_DONE) {
+        cerr << "[ERROR] step failed: " << sqlite3_errmsg(db) << endl;
+    }
     int new_id = (ok == SQLITE_DONE) ? (int)sqlite3_last_insert_rowid(db) : -1;
 
     sqlite3_finalize(stmt);

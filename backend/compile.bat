@@ -1,5 +1,6 @@
 @echo off
 cd /d %~dp0
+taskkill /F /IM server.exe >nul 2>&1
 
 echo ========================================
 echo  Build backend
@@ -21,6 +22,7 @@ g++ -std=c++17 ^
     -fexec-charset=GBK ^
     src/main.cpp ^
     src/db.cpp ^
+    src/routes_tasks.cpp ^
     sqlite3.o ^
     -lws2_32 ^
     -o server.exe
