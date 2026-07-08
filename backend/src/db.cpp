@@ -252,3 +252,49 @@ void init_tables() {
     sqlite3_close(db);
     cout << "[OK] 数据库初始化完成，所有表已就绪" << endl;
 }
+
+
+
+// ============================================================
+// 4. task_create() — 创建任务
+// ============================================================
+// 来个完整的 CRUD 示例，后面 task_get_list、task_update、
+// task_delete 都是照这个模板改几行 SQL。
+//
+// 为什么用 sqlite3_prepare + sqlite3_step，而不是 sqlite3_exec？
+//   1. 防 SQL 注入 —— 用户输入内容通过 bind 传进去，不会被当成 SQL 执行
+//   2. 能拿到新插入的 id —— sqlite3_last_insert_rowid
+//   3. 效率更高 —— SQL 只编译一次，可以重复 bind 不同参数执行
+// ============================================================
+
+int task_create(int user_id, const Task& t) {
+    sqlite3* db = open_db();
+    if (!db) return -1;
+
+    const char* sql = R"(
+        INSERT INTO tasks (user_id, title, topic, deadline, priority, need_review)
+        VALUES (?, ?, ?, ?, ?, ?)
+    )";
+
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, 0) != SQLITE_OK) {
+        cerr << "[ERROR] prepare: " << sqlite3_errmsg(db) << endl;
+        sqlite3_close(db);
+        return -1;
+    }
+
+    // 从 struct Task t 里取字段，按 ? 顺序绑定
+    sqlite3_bind_int(stmt,  1, user_id);
+    sqlite3_bind_text(stmt, 2, t.title.c_str(),    -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, t.topic.c_str(),    -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 4, t.deadline.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt,  5, t.priority);
+    sqlite3_bind_int(stmt,  6, t.need_review ? 1 : 0);
+
+    int ok = sqlite3_step(stmt);
+    int new_id = (ok == SQLITE_DONE) ? (int)sqlite3_last_insert_rowid(db) : -1;
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return new_id;
+}
