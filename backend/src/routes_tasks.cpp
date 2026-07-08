@@ -13,7 +13,8 @@ using json = nlohmann::json;
 
 // GET /api/tasks?user_id=1
 void handle_get_tasks(const Request& req, Response& res) {
-    int user_id = stoi(req.get_param_value("user_id"));
+    auto uid = req.get_param_value("user_id");
+    int user_id = uid.empty() ? 1 : stoi(uid);  // 没传默认1
     string data = task_get_list(user_id);
 
     json resp;
@@ -77,7 +78,8 @@ void handle_update_task(const Request& req, Response& res) {
 // DELETE /api/tasks/1?user_id=1
 void handle_delete_task(const Request& req, Response& res) {
     int task_id = stoi(req.matches[1]);
-    int user_id = stoi(req.get_param_value("user_id"));
+    auto uid = req.get_param_value("user_id");
+    int user_id = uid.empty() ? 1 : stoi(uid);
 
     bool ok = task_delete(task_id, user_id);
 
