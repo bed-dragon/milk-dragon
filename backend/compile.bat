@@ -1,5 +1,6 @@
 @echo off
 cd /d %~dp0
+taskkill /F /IM server.exe >nul 2>&1
 
 echo ========================================
 echo  Build backend
