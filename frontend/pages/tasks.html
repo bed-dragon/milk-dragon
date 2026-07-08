@@ -58,12 +58,12 @@
             <label class="form-label" for="taskTitle">任务标题 *</label>
             <input class="form-input" type="text" id="taskTitle" placeholder="输入任务名称..." required>
           </div>
-          <div style="display:flex;gap:var(--space-md);flex-wrap:wrap;">
-            <div class="form-group" style="flex:1;min-width:180px;">
+          <div class="flex flex-wrap gap-md">
+            <div class="form-group flex-1" style="min-width:180px;">
               <label class="form-label" for="taskDeadline">截止时间</label>
               <input class="form-input" type="datetime-local" id="taskDeadline">
             </div>
-            <div class="form-group" style="flex:1;min-width:150px;">
+            <div class="form-group flex-1" style="min-width:150px;">
               <label class="form-label" for="taskPriority">优先级</label>
               <select class="form-select" id="taskPriority">
                 <option value="2">中优先级</option>
@@ -71,7 +71,7 @@
                 <option value="3">低优先级</option>
               </select>
             </div>
-            <div class="form-group" style="flex:1;min-width:150px;">
+            <div class="form-group flex-1" style="min-width:150px;">
               <label class="form-label" for="taskTopic">主题分类</label>
               <input class="form-input" type="text" id="taskTopic" placeholder="如：英语、编程...">
             </div>
@@ -134,20 +134,19 @@
 
   <script src="../js/utils.js"></script>
   <script src="../js/api.js"></script>
+  <script src="../js/navigation.js"></script>
   <script>
     let editingId = null;
 
     document.getElementById('currentDate').textContent = today();
 
-    // 加载任务列表
+    // 加载任务列表（先展示 MOCK，再请求后端）
     async function loadTasks() {
+      renderTasks(MOCK.tasks);
       try {
         const data = await getTasks();
         renderTasks(data.tasks || []);
-      } catch (e) {
-        console.log('使用模拟数据');
-        renderTasks(MOCK.tasks);
-      }
+      } catch (e) { /* MOCK 已在展示 */ }
     }
 
     function renderTasks(tasks) {
@@ -243,7 +242,8 @@
 
     // 删除任务
     async function deleteTask(id) {
-      if (!confirm('确定要删除这个任务吗？')) return;
+      const confirmed = await showConfirm('确定要删除这个任务吗？此操作不可撤销。');
+      if (!confirmed) return;
       try {
         await _deleteTask(id);
         showToast('任务已删除', 'success');
@@ -256,15 +256,13 @@
       }
     }
 
-    // 推荐任务
+    // 推荐任务（先展示 MOCK，再请求后端）
     async function loadRecommended() {
-      const el = document.getElementById('recommendedList');
+      renderRecommended(MOCK.recommended);
       try {
         const data = await getRecommended();
         renderRecommended(data.tasks || []);
-      } catch (e) {
-        renderRecommended(MOCK.recommended);
-      }
+      } catch (e) { /* MOCK 已在展示 */ }
     }
 
     function renderRecommended(tasks) {

@@ -78,6 +78,38 @@ function calcRate(completed, total) {
   return Math.round((completed / total) * 100);
 }
 
+// ── 确认对话框 ──
+
+/** 显示确认对话框，返回 true/false */
+function showConfirm(message) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal-box">
+        <h3>⚠️ 确认操作</h3>
+        <p style="color:var(--text-secondary);">${message}</p>
+        <div class="modal-actions">
+          <button class="btn btn-outline" id="confirmCancel">取消</button>
+          <button class="btn btn-danger" id="confirmOk">确定</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const close = (result) => {
+      overlay.remove();
+      resolve(result);
+    };
+
+    overlay.querySelector('#confirmOk').addEventListener('click', () => close(true));
+    overlay.querySelector('#confirmCancel').addEventListener('click', () => close(false));
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close(false);
+    });
+  });
+}
+
 // ── Toast 通知 ──
 
 /** 显示 Toast 通知（3 秒自动消失） */
