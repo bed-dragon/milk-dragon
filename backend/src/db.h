@@ -116,7 +116,7 @@ string user_search(const string& keyword);
 int    task_create(int user_id, const Task& t);
 string task_get_list(int user_id);
 string task_get_one(int task_id);
-bool   task_update(int task_id, int user_id, const string& field, const string& value);
+bool   task_update(int task_id, int user_id, const Task& t);
 bool   task_delete(int task_id, int user_id);
 string task_recommended();
 

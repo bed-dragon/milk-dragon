@@ -299,7 +299,10 @@ int task_create(int user_id, const Task& t) {
     return new_id;
 }
 
-// ============================================================
+
+
+
+
 // 5. task_get_list() — 查询任务列表
 // ============================================================
 // SELECT 跟 INSERT 的区别：
@@ -338,4 +341,90 @@ string task_get_list(int user_id) {
     sqlite3_finalize(stmt);
     sqlite3_close(db);
     return result;                                // 返回 JSON 数组字符串
+}
+
+
+
+
+// 6. task_get_one() — 查询单个任务
+// ============================================================
+// 跟 task_get_list 一样是 SELECT，但只查一行（WHERE id=?）
+// 返回单个 JSON 对象，不是数组
+
+string task_get_one(int task_id) {
+    sqlite3* db = open_db();
+    if (!db) return "{}";
+
+    const char* sql = "SELECT id, user_id, title, topic, deadline, priority, status, need_review FROM tasks WHERE id=?";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    sqlite3_bind_int(stmt, 1, task_id);
+
+    string result = "{}";
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        result = "{";
+        result += "\"id\":"          + to_string(sqlite3_column_int(stmt, 0)) + ",";
+        result += "\"user_id\":"     + to_string(sqlite3_column_int(stmt, 1)) + ",";
+        result += "\"title\":\""     + string((const char*)sqlite3_column_text(stmt, 2)) + "\",";
+        result += "\"topic\":\""     + string((const char*)sqlite3_column_text(stmt, 3)) + "\",";
+        result += "\"deadline\":\""  + string((const char*)sqlite3_column_text(stmt, 4)) + "\",";
+        result += "\"priority\":"    + to_string(sqlite3_column_int(stmt, 5)) + ",";
+        result += "\"status\":"      + to_string(sqlite3_column_int(stmt, 6)) + ",";
+        result += "\"need_review\":" + to_string(sqlite3_column_int(stmt, 7));
+        result += "}";
+    }
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return result;
+}
+
+// ============================================================
+// 7. task_update() — 编辑任务
+// ============================================================
+bool task_update(int task_id, int user_id, const Task& t) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    const char* sql = R"(
+        UPDATE tasks SET title=?, topic=?, deadline=?, priority=?, status=?, need_review=?
+        WHERE id=? AND user_id=?
+    )";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+
+    sqlite3_bind_text(stmt, 1, t.title.c_str(),    -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, t.topic.c_str(),    -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, t.deadline.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt,  4, t.priority);
+    sqlite3_bind_int(stmt,  5, t.status);
+    sqlite3_bind_int(stmt,  6, t.need_review ? 1 : 0);
+    sqlite3_bind_int(stmt,  7, task_id);
+    sqlite3_bind_int(stmt,  8, user_id);
+
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return ok;
+}
+
+// ============================================================
+// 8. task_delete() — 删除任务
+// ============================================================
+// 跟 UPDATE 一个结构，就 SQL 不同
+// WHERE id=? AND user_id=? 双重验证，防止删别人的任务
+bool task_delete(int task_id, int user_id) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    const char* sql = "DELETE FROM tasks WHERE id=? AND user_id=?";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    sqlite3_bind_int(stmt, 1, task_id);
+    sqlite3_bind_int(stmt, 2, user_id);
+
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return ok;
 }
