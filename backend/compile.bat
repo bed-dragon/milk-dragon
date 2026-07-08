@@ -5,6 +5,9 @@ echo ========================================
 echo  Build backend
 echo ========================================
 
+:: 先杀掉旧进程，防止文件占用导致 Permission denied
+taskkill /F /IM server.exe >nul 2>&1
+
 :: 第1步：单独编译 sqlite3.c（C代码，用gcc）
 echo [1/2] Compiling sqlite3...
 gcc -c libs/sqlite3.c -o sqlite3.o
