@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学习养成计划 — 数据分析</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <!-- 侧边栏 -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-icon">📚</span>
+      <span>学习养成计划</span>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" href="../index.html">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">仪表盘</span>
+      </a>
+      <a class="nav-item" href="tasks.html">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">任务管理</span>
+      </a>
+      <a class="nav-item" href="checkin.html">
+        <span class="nav-icon">✅</span>
+        <span class="nav-label">打卡</span>
+      </a>
+      <a class="nav-item active" href="stats.html">
+        <span class="nav-icon">📈</span>
+        <span class="nav-label">数据分析</span>
+      </a>
+      <a class="nav-item" href="reminders.html">
+        <span class="nav-icon">🔔</span>
+        <span class="nav-label">提醒中心</span>
+      </a>
+    </nav>
+  </aside>
+
+  <!-- 主区域 -->
+  <div class="main-wrapper">
+    <header class="topbar">
+      <h1 class="topbar-title">数据分析</h1>
+      <div class="topbar-right">
+        <span class="topbar-date" id="currentDate"></span>
+      </div>
+    </header>
+
+    <main class="content">
+      <!-- 时间范围选择 -->
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:var(--space-md);flex-wrap:wrap;">
+          <label style="font-weight:500;">时间范围：</label>
+          <button class="btn btn-sm btn-primary" onclick="setRange('week')" data-range="week">本周</button>
+          <button class="btn btn-sm btn-outline" onclick="setRange('month')" data-range="month">本月</button>
+          <button class="btn btn-sm btn-outline" onclick="setRange('custom')" data-range="custom">自定义</button>
+          <input class="form-input" type="date" id="startDate" style="width:auto;display:none;">
+          <input class="form-input" type="date" id="endDate" style="width:auto;display:none;">
+          <button class="btn btn-sm btn-primary" id="customBtn" style="display:none;" onclick="loadCharts()">确定</button>
+        </div>
+      </div>
+
+      <!-- 总览统计 -->
+      <div class="stat-grid" id="statsOverview">
+        <div class="stat-card">
+          <div class="stat-icon">📋</div>
+          <div class="stat-value" id="statTotal">0</div>
+          <div class="stat-label">总任务数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">✅</div>
+          <div class="stat-value" id="statCompleted">0</div>
+          <div class="stat-label">已完成</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📈</div>
+          <div class="stat-value" id="statRate">0%</div>
+          <div class="stat-label">完成率</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🔥</div>
+          <div class="stat-value" id="statStreak">0</div>
+          <div class="stat-label">连续打卡</div>
+        </div>
+      </div>
+
+      <!-- 折线图：每日任务添加数 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">📈 每日任务添加趋势</h2>
+        </div>
+        <div id="chartAdded" style="width:100%;height:300px;"></div>
+      </div>
+
+      <!-- 柱状图：每日完成率 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">📊 每日完成率</h2>
+        </div>
+        <div id="chartRate" style="width:100%;height:300px;"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../libs/echarts.min.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/api.js"></script>
+  <script>
+    let currentRange = 'week';
+    let chartAdded = null;
+    let chartRate = null;
+
+    document.getElementById('currentDate').textContent = today();
+    initRange();
+    loadCharts();
+
+    function initRange() {
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+      document.getElementById('startDate').value = formatDate(monday);
+      document.getElementById('endDate').value = today();
+    }
+
+    function setRange(type) {
+      currentRange = type;
+      document.querySelectorAll('[data-range]').forEach(btn => {
+        btn.className = `btn btn-sm ${btn.dataset.range === type ? 'btn-primary' : 'btn-outline'}`;
+      });
+
+      const showCustom = type === 'custom';
+      document.getElementById('startDate').style.display = showCustom ? 'inline-block' : 'none';
+      document.getElementById('endDate').style.display = showCustom ? 'inline-block' : 'none';
+      document.getElementById('customBtn').style.display = showCustom ? 'inline-block' : 'none';
+
+      if (type === 'week') {
+        initRange();
+      } else if (type === 'month') {
+        const now = new Date();
+        const first = new Date(now.getFullYear(), now.getMonth(), 1);
+        document.getElementById('startDate').value = formatDate(first);
+        document.getElementById('endDate').value = today();
+      }
+      loadCharts();
+    }
+
+    async function loadCharts() {
+      const start = document.getElementById('startDate').value;
+      const end = document.getElementById('endDate').value;
+
+      try {
+        const [overview, dailyData] = await Promise.all([
+          getOverview(),
+          getDailyStats(start, end)
+        ]);
+        renderOverview(overview);
+        renderCharts(dailyData.daily || []);
+      } catch (e) {
+        // 模拟数据
+        renderOverview(MOCK.overview);
+        renderCharts(MOCK.dailyStats);
+      }
+    }
+
+    function renderOverview(data) {
+      document.getElementById('statTotal').textContent = data.total_tasks || 0;
+      document.getElementById('statCompleted').textContent = data.completed || 0;
+      document.getElementById('statRate').textContent = calcRate(data.completed, data.total_tasks) + '%';
+      document.getElementById('statStreak').textContent = data.streak || 0;
+    }
+
+    function renderCharts(daily) {
+      if (!daily || !daily.length) {
+        daily = MOCK.dailyStats;
+      }
+
+      const dates = daily.map(d => d.date);
+      const added = daily.map(d => d.added);
+      const rates = daily.map(d => Math.round((d.rate || 0) * 100));
+
+      // 折线图
+      if (!chartAdded) {
+        chartAdded = echarts.init(document.getElementById('chartAdded'));
+      }
+      chartAdded.setOption({
+        tooltip: { trigger: 'axis' },
+        grid: { left: '5%', right: '5%', bottom: '10%', top: '10%', containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: dates,
+          axisLabel: { fontSize: 12 }
+        },
+        yAxis: {
+          type: 'value',
+          minInterval: 1,
+          name: '任务数'
+        },
+        series: [{
+          type: 'line',
+          data: added,
+          smooth: true,
+          lineStyle: { color: '#4a6cf7', width: 3 },
+          itemStyle: { color: '#4a6cf7' },
+          areaStyle: {
+            color: {
+              type: 'linear',
+              x: 0, y: 0, x2: 0, y2: 1,
+              colorStops: [
+                { offset: 0, color: 'rgba(74,108,247,0.3)' },
+                { offset: 1, color: 'rgba(74,108,247,0.02)' }
+              ]
+            }
+          },
+          markLine: {
+            data: [{ type: 'average', name: '平均值' }],
+            label: { formatter: '平均: {c}' }
+          }
+        }]
+      });
+
+      // 柱状图
+      if (!chartRate) {
+        chartRate = echarts.init(document.getElementById('chartRate'));
+      }
+      chartRate.setOption({
+        tooltip: {
+          trigger: 'axis',
+          formatter: function(params) {
+            const p = params[0];
+            return `${p.axisValue}<br/>完成率: ${p.value}%`;
+          }
+        },
+        grid: { left: '5%', right: '5%', bottom: '10%', top: '10%', containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: dates,
+          axisLabel: { fontSize: 12 }
+        },
+        yAxis: {
+          type: 'value',
+          max: 100,
+          name: '完成率 (%)',
+          axisLabel: { formatter: '{value}%' }
+        },
+        series: [{
+          type: 'bar',
+          data: rates.map(v => ({
+            value: v,
+            itemStyle: {
+              color: v >= 80 ? '#27ae60' : v >= 50 ? '#f39c12' : '#e74c3c'
+            }
+          })),
+          barWidth: '40%',
+          label: {
+            show: true,
+            position: 'top',
+            formatter: '{c}%',
+            fontSize: 11
+          }
+        }]
+      });
+    }
+
+    // 窗口大小变化时自适应
+    window.addEventListener('resize', () => {
+      chartAdded && chartAdded.resize();
+      chartRate && chartRate.resize();
+    });
+  </script>
+</body>
+</html>
