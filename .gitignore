@@ -23,3 +23,6 @@ cmake-build-*/
 # OS 文件
 .DS_Store
 Thumbs.db
+
+# 数据库文件（本地数据，不提交，避免合并冲突）
+backend/data/
