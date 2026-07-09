@@ -866,8 +866,60 @@ string material_list(int)                                 { return "[]"; }
 bool   material_add(int, const string&, const string&)    { return false; }
 bool   material_delete(int, int)                          { return false; }
 // 番茄钟
-bool   pomodoro_record(int, int)                          { return false; }
-string pomodoro_today(int)                                { return "[]"; }
+bool pomodoro_record(int user_id, int duration) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    string today = today_str();
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql =
+        "INSERT INTO pomodoros (user_id, duration, date) VALUES (?, ?, ?);";
+    bool ok = false;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, user_id);
+        sqlite3_bind_int(stmt, 2, duration);
+        sqlite3_bind_text(stmt, 3, today.c_str(), -1, SQLITE_TRANSIENT);
+        ok = (sqlite3_step(stmt) == SQLITE_DONE);
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return ok;
+}
+
+string pomodoro_today(int user_id) {
+    sqlite3* db = open_db();
+    if (!db) return "[]";
+
+    string today = today_str();
+    json arr = json::array();
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql =
+        "SELECT id, duration, created_at, date FROM pomodoros "
+        "WHERE user_id = ? AND date = ? ORDER BY created_at ASC;";
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, user_id);
+        sqlite3_bind_text(stmt, 2, today.c_str(), -1, SQLITE_TRANSIENT);
+
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            const char* ca = (const char*)sqlite3_column_text(stmt, 2);
+            string start_time = "-";
+            if (ca) {
+                string s(ca);
+                if (s.length() >= 16) start_time = s.substr(11, 5);  // "HH:MM"
+            }
+            json r;
+            r["id"]         = sqlite3_column_int(stmt, 0);
+            r["duration"]   = sqlite3_column_int(stmt, 1);
+            r["start_time"] = start_time;
+            r["date"]       = (const char*)sqlite3_column_text(stmt, 3);
+            arr.push_back(r);
+        }
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return arr.dump();
+}
 // 名言
 string quote_random() {
     sqlite3* db = open_db();

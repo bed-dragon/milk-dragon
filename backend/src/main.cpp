@@ -191,11 +191,30 @@ int main() {
     });
 
     // ---------------- 番茄钟（Pomodoro） ----------------
-    svr.Post("/api/pomodoro", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true,\"message\":\"pomodoro recorded (stub)\"}", "application/json");
+    svr.Post("/api/pomodoro", [&](const Request& req, Response& res) {
+        try {
+            json body = json::parse(req.body);
+            int user_id = body.value("user_id", 1);
+            int duration = body.value("duration", 25);
+
+            if (pomodoro_record(user_id, duration)) {
+                res.set_content(R"({"ok":true,"message":"pomodoro recorded"})", "application/json");
+            } else {
+                res.status = 500;
+                res.set_content(R"({"ok":false,"error":"record failed"})", "application/json");
+            }
+        } catch (const exception& e) {
+            res.status = 400;
+            json resp = {{"ok", false}, {"error", string("parse error: ") + e.what()}};
+            res.set_content(resp.dump(), "application/json");
+        }
     });
-    svr.Get("/api/pomodoro/today", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true,\"data\":[]}", "application/json");
+
+    svr.Get("/api/pomodoro/today", [&](const Request& req, Response& res) {
+        int user_id = get_uid(req);
+        string data_str = pomodoro_today(user_id);
+        json resp = {{"ok", true}, {"data", json::parse(data_str)}};
+        res.set_content(resp.dump(), "application/json");
     });
 
     // ---------------- 账号与用户 ----------------
