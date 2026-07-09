@@ -39,6 +39,9 @@
         <span class="nav-label">番茄钟</span>
       </a>
     </nav>
+    <div class="sidebar-user" id="sidebarUserArea">
+      <span class="sidebar-user-name">未登录</span>
+    </div>
   </aside>
 
   <!-- 主区域 -->
@@ -109,9 +112,12 @@
     </main>
   </div>
 
+  <script src="../js/auth.js"></script>
   <script src="../js/utils.js"></script>
   <script src="../js/api.js"></script>
   <script>
+    Auth.guard();
+    Auth.renderSidebarUser();
     // 计时器状态
     const DEFAULT_MINUTES = 25;
     let totalSeconds = DEFAULT_MINUTES * 60;

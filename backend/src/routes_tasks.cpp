@@ -4,6 +4,23 @@
 using namespace std;
 using json = nlohmann::json;
 
+// 从 Authorization Bearer token 解析 user_id（声明自 db.h）
+extern int user_id_by_token(const string& token);
+
+// 辅助：从请求中解析 user_id，失败返回 -1
+static int get_uid_from_req(const Request& req) {
+    if (req.has_header("Authorization")) {
+        string auth = req.get_header_value("Authorization");
+        if (auth.rfind("Bearer ", 0) == 0) {
+            return user_id_by_token(auth.substr(7));
+        }
+    }
+    // 兼容 query param
+    auto uid = req.get_param_value("user_id");
+    if (!uid.empty()) return stoi(uid);
+    return -1;
+}
+
 #define CATCH_ERR catch(exception& e) { \
     cerr << "[ERROR] " << e.what() << endl; \
     res.set_content(string(R"({"ok":false,"error":")") + e.what() + "\"}", "application/json"); \
@@ -11,8 +28,8 @@ using json = nlohmann::json;
 
 // GET /api/tasks
 void handle_get_tasks(const Request& req, Response& res) { try {
-    auto uid = req.get_param_value("user_id");
-    int user_id = uid.empty() ? 1 : stoi(uid);
+    int user_id = get_uid_from_req(req);
+    if (user_id <= 0) { res.status = 401; res.set_content(R"({"ok":false,"error":"请先登录"})", "application/json"); return; }
     string data = task_get_list(user_id);
     json resp;
     resp["ok"] = true;
@@ -32,6 +49,8 @@ void handle_get_one_task(const Request& req, Response& res) { try {
 
 // POST /api/tasks
 void handle_create_task(const Request& req, Response& res) { try {
+    int user_id = get_uid_from_req(req);
+    if (user_id <= 0) { res.status = 401; res.set_content(R"({"ok":false,"error":"请先登录"})", "application/json"); return; }
     json body = json::parse(req.body);
     Task t;
     t.title       = body["title"];
@@ -44,7 +63,6 @@ void handle_create_task(const Request& req, Response& res) { try {
         if (nr.is_boolean())    t.need_review = nr.get<bool>();
         else if (nr.is_number()) t.need_review = (nr.get<int>() != 0);
     }
-    int user_id = body.value("user_id", 1);
     int new_id = task_create(user_id, t);
     json resp;
     resp["ok"] = (new_id > 0);
@@ -54,6 +72,8 @@ void handle_create_task(const Request& req, Response& res) { try {
 
 // PUT /api/tasks/1
 void handle_update_task(const Request& req, Response& res) { try {
+    int user_id = get_uid_from_req(req);
+    if (user_id <= 0) { res.status = 401; res.set_content(R"({"ok":false,"error":"请先登录"})", "application/json"); return; }
     int task_id = stoi(req.matches[1]);
     json body = json::parse(req.body);
     Task t;
@@ -67,7 +87,6 @@ void handle_update_task(const Request& req, Response& res) { try {
         if (nr.is_boolean())    t.need_review = nr.get<bool>();
         else if (nr.is_number()) t.need_review = (nr.get<int>() != 0);
     }
-    int user_id = body.value("user_id", 1);
     bool ok = task_update(task_id, user_id, t);
     json resp;
     resp["ok"] = ok;
@@ -76,9 +95,9 @@ void handle_update_task(const Request& req, Response& res) { try {
 
 // DELETE /api/tasks/1
 void handle_delete_task(const Request& req, Response& res) { try {
+    int user_id = get_uid_from_req(req);
+    if (user_id <= 0) { res.status = 401; res.set_content(R"({"ok":false,"error":"请先登录"})", "application/json"); return; }
     int task_id = stoi(req.matches[1]);
-    auto uid = req.get_param_value("user_id");
-    int user_id = uid.empty() ? 1 : stoi(uid);
     bool ok = task_delete(task_id, user_id);
     json resp;
     resp["ok"] = ok;
