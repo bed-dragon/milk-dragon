@@ -3,6 +3,7 @@
 #include "db.h"
 #include "json.hpp"
 #include "routes_tasks.h"
+#include "routes_auth.h"
 
 using namespace httplib;
 using json = nlohmann::json;
@@ -199,15 +200,10 @@ int main() {
     });
 
     // ---------------- 账号与用户 ----------------
-    svr.Post("/api/auth/register", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true,\"message\":\"registered (stub)\",\"data\":{\"user_id\":1}}", "application/json");
-    });
-    svr.Post("/api/auth/login", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true,\"token\":\"stub-token\"}", "application/json");
-    });
-    svr.Get(R"(/api/users/:id)", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true,\"data\":{\"id\":1,\"username\":\"user\"}}", "application/json");
-    });
+    svr.Post("/api/auth/register",  handle_register);
+    svr.Post("/api/auth/login",     handle_login);
+    svr.Get("/api/me",              handle_get_me);
+    svr.Get("/api/users/search",    handle_search_users);
 
     // ---------------- 好友与社交 ----------------
     svr.Post("/api/friends/request", [](const Request& req, Response& res) {

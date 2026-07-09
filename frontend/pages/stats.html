@@ -176,7 +176,7 @@
 
     function renderCharts(daily) {
       if (!daily || !daily.length) {
-        daily = MOCK.dailyStats;
+        daily = [];
       }
 
       const dates = daily.map(d => d.date);
