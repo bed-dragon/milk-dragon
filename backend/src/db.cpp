@@ -519,6 +519,19 @@ bool task_update(int task_id, int user_id, const Task& t) {
     sqlite3* db = open_db();
     if (!db) return false;
 
+    // 如果 status=-1，表示前端没传，保留数据库原值
+    int st = t.status;
+    if (st == -1) {
+        const char* q = "SELECT status FROM tasks WHERE id=?";
+        sqlite3_stmt* s = nullptr;
+        if (sqlite3_prepare_v2(db, q, -1, &s, 0) == SQLITE_OK) {
+            sqlite3_bind_int(s, 1, task_id);
+            if (sqlite3_step(s) == SQLITE_ROW) st = sqlite3_column_int(s, 0);
+            else st = 0;
+            sqlite3_finalize(s);
+        }
+    }
+
     const char* sql = R"(
         UPDATE tasks SET title=?, topic=?, deadline=?, priority=?, status=?, need_review=?
         WHERE id=? AND user_id=?
@@ -530,7 +543,7 @@ bool task_update(int task_id, int user_id, const Task& t) {
     sqlite3_bind_text(stmt, 2, t.topic.c_str(),    -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 3, t.deadline.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_int(stmt,  4, t.priority);
-    sqlite3_bind_int(stmt,  5, t.status);
+    sqlite3_bind_int(stmt,  5, st);  // 用保留后的状态
     sqlite3_bind_int(stmt,  6, t.need_review ? 1 : 0);
     sqlite3_bind_int(stmt,  7, task_id);
     sqlite3_bind_int(stmt,  8, user_id);

@@ -81,7 +81,11 @@ void handle_update_task(const Request& req, Response& res) { try {
     t.topic       = body.value("topic", "");
     t.deadline    = body.value("deadline", "");
     t.priority    = body.value("priority", 1);
-    t.status      = body.value("status", 0);
+    // 只有前端显式传了 status 才更新，否则保留原状态（防打卡状态被覆盖）
+    if (body.contains("status"))
+        t.status = body["status"];
+    else
+        t.status = -1;  // -1 = 不更新此字段
     if (body.contains("need_review")) {
         auto& nr = body["need_review"];
         if (nr.is_boolean())    t.need_review = nr.get<bool>();
