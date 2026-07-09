@@ -3,6 +3,7 @@
 #include <set>
 #include <map>
 #include <ctime>
+#include <direct.h>
 #include "sqlite3.h"
 #include "json.hpp"
 #include "sha256.h"
@@ -18,6 +19,8 @@ using namespace std;
 // ---------- 1. open_db ----------
 
 sqlite3* open_db() {
+    // 确保 data 目录存在（合并后可能丢失）
+    _mkdir("data");
     sqlite3* db = nullptr;
     int rc = sqlite3_open("data/study.db", &db);
     if (rc != SQLITE_OK) {
@@ -519,6 +522,19 @@ bool task_update(int task_id, int user_id, const Task& t) {
     sqlite3* db = open_db();
     if (!db) return false;
 
+    // 如果 status=-1，表示前端没传，保留数据库原值
+    int st = t.status;
+    if (st == -1) {
+        const char* q = "SELECT status FROM tasks WHERE id=?";
+        sqlite3_stmt* s = nullptr;
+        if (sqlite3_prepare_v2(db, q, -1, &s, 0) == SQLITE_OK) {
+            sqlite3_bind_int(s, 1, task_id);
+            if (sqlite3_step(s) == SQLITE_ROW) st = sqlite3_column_int(s, 0);
+            else st = 0;
+            sqlite3_finalize(s);
+        }
+    }
+
     const char* sql = R"(
         UPDATE tasks SET title=?, topic=?, deadline=?, priority=?, status=?, need_review=?
         WHERE id=? AND user_id=?
@@ -530,7 +546,7 @@ bool task_update(int task_id, int user_id, const Task& t) {
     sqlite3_bind_text(stmt, 2, t.topic.c_str(),    -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 3, t.deadline.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_int(stmt,  4, t.priority);
-    sqlite3_bind_int(stmt,  5, t.status);
+    sqlite3_bind_int(stmt,  5, st);  // 用保留后的状态
     sqlite3_bind_int(stmt,  6, t.need_review ? 1 : 0);
     sqlite3_bind_int(stmt,  7, task_id);
     sqlite3_bind_int(stmt,  8, user_id);
@@ -1161,9 +1177,87 @@ bool friend_delete(int friendship_id, int user_id) {
     return ok;
 }
 // 聊天
-bool   message_send(int, int, const string&)              { return false; }
-string message_history(int, int)                          { return "[]"; }
-int    message_unread_count(int)                          { return 0; }
+bool message_send(int from_id, int to_id, const string& content) {
+    if (from_id == to_id || content.empty()) return false;
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql = "INSERT INTO messages (from_id, to_id, content, is_read) VALUES (?, ?, ?, 0);";
+    bool ok = false;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, from_id);
+        sqlite3_bind_int(stmt, 2, to_id);
+        sqlite3_bind_text(stmt, 3, content.c_str(), -1, SQLITE_TRANSIENT);
+        ok = (sqlite3_step(stmt) == SQLITE_DONE);
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return ok;
+}
+
+string message_history(int user_id, int friend_id) {
+    sqlite3* db = open_db();
+    if (!db) return "[]";
+
+    json arr = json::array();
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql =
+        "SELECT id, from_id, to_id, content, is_read, created_at "
+        "FROM messages "
+        "WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?) "
+        "ORDER BY created_at ASC;";
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, user_id);
+        sqlite3_bind_int(stmt, 2, friend_id);
+        sqlite3_bind_int(stmt, 3, friend_id);
+        sqlite3_bind_int(stmt, 4, user_id);
+
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            json m;
+            m["id"]         = sqlite3_column_int(stmt, 0);
+            m["from_id"]    = sqlite3_column_int(stmt, 1);
+            m["to_id"]      = sqlite3_column_int(stmt, 2);
+            m["content"]    = (const char*)sqlite3_column_text(stmt, 3);
+            m["is_read"]    = sqlite3_column_int(stmt, 4);
+            m["created_at"] = (const char*)sqlite3_column_text(stmt, 5);
+            m["mine"]       = (sqlite3_column_int(stmt, 1) == user_id);
+            arr.push_back(m);
+        }
+        sqlite3_finalize(stmt);
+
+        // 对方发给我的标记为已读
+        const char* upd =
+            "UPDATE messages SET is_read=1 WHERE from_id=? AND to_id=? AND is_read=0;";
+        if (sqlite3_prepare_v2(db, upd, -1, &stmt, nullptr) == SQLITE_OK) {
+            sqlite3_bind_int(stmt, 1, friend_id);
+            sqlite3_bind_int(stmt, 2, user_id);
+            sqlite3_step(stmt);
+            sqlite3_finalize(stmt);
+        }
+    }
+    sqlite3_close(db);
+    return arr.dump();
+}
+
+int message_unread_count(int user_id) {
+    sqlite3* db = open_db();
+    if (!db) return 0;
+
+    int count = 0;
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql = "SELECT COUNT(*) FROM messages WHERE to_id=? AND is_read=0;";
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, user_id);
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+            count = sqlite3_column_int(stmt, 0);
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return count;
+}
 // 收藏 — 获取列表
 string material_list(int user_id) {
     sqlite3* db = open_db();
