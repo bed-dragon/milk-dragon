@@ -1015,58 +1015,10 @@ bool   friend_delete(int, int)                            { return false; }
 bool   message_send(int, int, const string&)              { return false; }
 string message_history(int, int)                          { return "[]"; }
 int    message_unread_count(int)                          { return 0; }
-// 收藏 — 获取列表
-string material_list(int user_id) {
-    sqlite3* db = open_db();
-    if (!db) return "[]";
-    const char* sql = "SELECT id, title, url, created_at FROM materials WHERE user_id=? ORDER BY id DESC";
-    sqlite3_stmt* stmt = nullptr;
-    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
-    sqlite3_bind_int(stmt, 1, user_id);
-    string result = "[";
-    bool first = true;
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
-        if (!first) result += ",";
-        first = false;
-        result += "{\"id\":"     + to_string(sqlite3_column_int(stmt, 0)) + ",";
-        result += "\"title\":\""  + string((const char*)sqlite3_column_text(stmt, 1)) + "\",";
-        result += "\"url\":\""    + string((const char*)sqlite3_column_text(stmt, 2)) + "\",";
-        result += "\"created_at\":\"" + string((const char*)sqlite3_column_text(stmt, 3)) + "\"}";
-    }
-    result += "]";
-    sqlite3_finalize(stmt);
-    sqlite3_close(db);
-    return result;
-}
-// 收藏 — 添加
-bool material_add(int user_id, const string& title, const string& url) {
-    sqlite3* db = open_db();
-    if (!db) return false;
-    const char* sql = "INSERT INTO materials (user_id, title, url) VALUES (?, ?, ?)";
-    sqlite3_stmt* stmt = nullptr;
-    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
-    sqlite3_bind_int(stmt,  1, user_id);
-    sqlite3_bind_text(stmt, 2, title.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(stmt, 3, url.c_str(),   -1, SQLITE_TRANSIENT);
-    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
-    sqlite3_finalize(stmt);
-    sqlite3_close(db);
-    return ok;
-}
-// 收藏 — 删除
-bool material_delete(int material_id, int user_id) {
-    sqlite3* db = open_db();
-    if (!db) return false;
-    const char* sql = "DELETE FROM materials WHERE id=? AND user_id=?";
-    sqlite3_stmt* stmt = nullptr;
-    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
-    sqlite3_bind_int(stmt, 1, material_id);
-    sqlite3_bind_int(stmt, 2, user_id);
-    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
-    sqlite3_finalize(stmt);
-    sqlite3_close(db);
-    return ok;
-}
+// 收藏
+string material_list(int)                                 { return "[]"; }
+bool   material_add(int, const string&, const string&)    { return false; }
+bool   material_delete(int, int)                          { return false; }
 // 番茄钟
 bool   pomodoro_record(int, int)                          { return false; }
 string pomodoro_today(int)                                { return "[]"; }
