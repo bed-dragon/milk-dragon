@@ -638,6 +638,19 @@ bool checkin_do(int user_id, int task_id, const string& date) {
         if (!ok) cerr << "[WARN] checkin_do: 可能重复打卡 " << sqlite3_errmsg(db) << endl;
         sqlite3_finalize(stmt);
     }
+
+    // 打卡成功 → 标记任务为已完成
+    if (ok) {
+        const char* upd = "UPDATE tasks SET status=1 WHERE id=? AND user_id=?";
+        sqlite3_stmt* stmt2 = nullptr;
+        if (sqlite3_prepare_v2(db, upd, -1, &stmt2, nullptr) == SQLITE_OK) {
+            sqlite3_bind_int(stmt2, 1, task_id);
+            sqlite3_bind_int(stmt2, 2, user_id);
+            sqlite3_step(stmt2);
+            sqlite3_finalize(stmt2);
+        }
+    }
+
     sqlite3_close(db);
     return ok;
 }
@@ -778,7 +791,7 @@ string stats_overview(int user_id) {
     }
 
     const char* sql_done =
-        "SELECT COUNT(DISTINCT task_id) FROM checkins WHERE user_id = ?;";
+        "SELECT COUNT(*) FROM tasks WHERE user_id = ? AND status = 1;";
     if (sqlite3_prepare_v2(db, sql_done, -1, &stmt, nullptr) == SQLITE_OK) {
         sqlite3_bind_int(stmt, 1, user_id);
         if (sqlite3_step(stmt) == SQLITE_ROW)
