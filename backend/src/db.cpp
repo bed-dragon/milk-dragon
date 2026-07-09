@@ -5,6 +5,7 @@
 #include <ctime>
 #include "sqlite3.h"
 #include "json.hpp"
+#include "sha256.h"
 
 using json = nlohmann::json;
 using namespace std;
@@ -217,6 +218,31 @@ void init_tables() {
 }
 
 // ============================================================
+// 用户模块
+// ============================================================
+
+// 注册：密码 SHA256 哈希后存入，返回新用户 id，重名返回 -1
+int user_create(const string& username, const string& password) {
+    sqlite3* db = open_db();
+    if (!db) return -1;
+
+    string hash = sha256(password);
+
+    const char* sql = "INSERT INTO users (username, password_hash) VALUES (?, ?)";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, hash.c_str(),     -1, SQLITE_TRANSIENT);
+
+    int ok = sqlite3_step(stmt);
+    int new_id = (ok == SQLITE_DONE) ? (int)sqlite3_last_insert_rowid(db) : -1;
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return new_id;
+}
+
+// ============================================================
 // 辅助函数
 // ============================================================
 
@@ -254,14 +280,117 @@ static string date_offset_str(int days_offset) {
 }
 
 // ============================================================
-// 用户模块（占位）
 // ============================================================
+// 4. 用户登录
+// ============================================================
+// 验证用户名密码，成功返回 token JSON，失败返回 "{}"
+string user_login(const string& username, const string& password) {
+    sqlite3* db = open_db();
+    if (!db) return "{}";
 
-int    user_create(const string&, const string&) { return -1; }
-string user_login(const string&, const string&)  { return "{}"; }
-int    user_id_by_token(const string&)           { return -1; }
-string user_get_info(int)                        { return "{}"; }
-string user_search(const string&)                { return "[]"; }
+    string hash = sha256(password);
+
+    // 先查密码哈希是否匹配
+    const char* sql = "SELECT id, password_hash FROM users WHERE username=?";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
+
+    string result = "{}";
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        int uid = sqlite3_column_int(stmt, 0);
+        const char* db_hash = (const char*)sqlite3_column_text(stmt, 1);
+
+        if (hash == string(db_hash)) {  // 哈希匹配，登录成功
+            // 生成 token：用户名+时间戳 的 SHA256
+            string token = sha256(username + to_string(time(nullptr)));
+
+            sqlite3_finalize(stmt);  // 先释放 SELECT 的 stmt
+            stmt = nullptr;
+
+            // 把 token 存进数据库
+            const char* upd = "UPDATE users SET token=? WHERE id=?";
+            sqlite3_prepare_v2(db, upd, -1, &stmt, 0);
+            sqlite3_bind_text(stmt, 1, token.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_int(stmt, 2, uid);
+            sqlite3_step(stmt);
+
+            result = "{\"token\":\"" + token + "\",\"user_id\":" + to_string(uid) + "}";
+        }
+    }
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return result;
+}
+// 通过 token 查用户 id，用于中间件验证，失败返回 -1
+int user_id_by_token(const string& token) {
+    sqlite3* db = open_db();
+    if (!db || token.empty()) return -1;
+
+    const char* sql = "SELECT id FROM users WHERE token=?";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    sqlite3_bind_text(stmt, 1, token.c_str(), -1, SQLITE_TRANSIENT);
+
+    int uid = (sqlite3_step(stmt) == SQLITE_ROW) ? sqlite3_column_int(stmt, 0) : -1;
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return uid;
+}
+
+// 查用户信息，返回 JSON（不含密码和 token）
+string user_get_info(int user_id) {
+    sqlite3* db = open_db();
+    if (!db) return "{}";
+
+    const char* sql = "SELECT id, username, nickname, signature, created_at FROM users WHERE id=?";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    sqlite3_bind_int(stmt, 1, user_id);
+
+    string result = "{}";
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        result = "{";
+        result += "\"id\":"        + to_string(sqlite3_column_int(stmt, 0)) + ",";
+        result += "\"username\":\"" + string((const char*)sqlite3_column_text(stmt, 1)) + "\",";
+        result += "\"nickname\":\"" + string((const char*)sqlite3_column_text(stmt, 2)) + "\",";
+        result += "\"signature\":\"" + string((const char*)sqlite3_column_text(stmt, 3)) + "\",";
+        result += "\"created_at\":\"" + string((const char*)sqlite3_column_text(stmt, 4)) + "\"";
+        result += "}";
+    }
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return result;
+}
+
+// 模糊搜索用户
+string user_search(const string& keyword) {
+    sqlite3* db = open_db();
+    if (!db) return "[]";
+
+    string like = "%" + keyword + "%";
+    const char* sql = "SELECT id, username FROM users WHERE username LIKE ? LIMIT 20";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    sqlite3_bind_text(stmt, 1, like.c_str(), -1, SQLITE_TRANSIENT);
+
+    string result = "[";
+    bool first = true;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        if (!first) result += ",";
+        first = false;
+        result += "{\"id\":"     + to_string(sqlite3_column_int(stmt, 0)) + ",";
+        result += "\"username\":\"" + string((const char*)sqlite3_column_text(stmt, 1)) + "\"}";
+    }
+    result += "]";
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return result;
+}
 
 // ============================================================
 // 任务模块（使用 Task struct 传参）
