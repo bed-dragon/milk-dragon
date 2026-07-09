@@ -154,11 +154,7 @@
       const start = document.getElementById('startDate').value;
       const end = document.getElementById('endDate').value;
 
-      // 先展示 MOCK 数据，秒开
-      renderOverview(MOCK.overview);
-      renderCharts(MOCK.dailyStats);
-
-      // 同时请求后端，成功后无缝更新
+      // 直接请求后端真实数据
       try {
         const [overview, dailyData] = await Promise.all([
           getOverview(),
@@ -166,7 +162,12 @@
         ]);
         renderOverview(overview);
         renderCharts(dailyData.daily || []);
-      } catch (e) { /* MOCK 已在展示 */ }
+      } catch (e) {
+        // 后端挂了才用 MOCK
+        console.warn('后端请求失败，使用模拟数据');
+        renderOverview(MOCK.overview);
+        renderCharts(MOCK.dailyStats);
+      }
     }
 
     function renderOverview(data) {
@@ -178,7 +179,7 @@
 
     function renderCharts(daily) {
       if (!daily || !daily.length) {
-        daily = MOCK.dailyStats;
+        daily = [];
       }
 
       const dates = daily.map(d => d.date);

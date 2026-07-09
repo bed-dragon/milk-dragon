@@ -12,7 +12,7 @@
  */
 
 const API_BASE = 'http://localhost:8080';
-const REQUEST_TIMEOUT = 2000; // 2 秒超时，快速降级到 MOCK
+const REQUEST_TIMEOUT = 8000; // 8 秒超时，给后端充足时间
 
 /**
  * 通用请求函数（带超时）
