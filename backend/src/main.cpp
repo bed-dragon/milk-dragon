@@ -1,4 +1,5 @@
 #define _WIN32_WINNT 0x0A00   // Windows 10+，httplib 编译需要
+#include <cstdlib>
 #include "httplib.h"
 #include "db.h"
 #include "json.hpp"
@@ -15,7 +16,7 @@ using json = nlohmann::json;
 using namespace std;
 
 int main() {
-    // 1. 初始化数据库（建表）
+    system("chcp 65001 >nul");  // 控制台设为 UTF-8，中文不乱码
     init_tables();
 
     // 2. 创建 HTTP 服务器
