@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学习养成计划 — 番茄钟</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <!-- 侧边栏 -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-icon">📚</span>
+      <span>学习养成计划</span>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" href="../index.html">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">仪表盘</span>
+      </a>
+      <a class="nav-item" href="tasks.html">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">任务管理</span>
+      </a>
+      <a class="nav-item" href="checkin.html">
+        <span class="nav-icon">✅</span>
+        <span class="nav-label">打卡</span>
+      </a>
+      <a class="nav-item" href="stats.html">
+        <span class="nav-icon">📈</span>
+        <span class="nav-label">数据分析</span>
+      </a>
+      <a class="nav-item" href="reminders.html">
+        <span class="nav-icon">🔔</span>
+        <span class="nav-label">提醒中心</span>
+      </a>
+      <a class="nav-item active" href="pomodoro.html">
+        <span class="nav-icon">🍅</span>
+        <span class="nav-label">番茄钟</span>
+      </a>
+    </nav>
+    <div class="sidebar-user" id="sidebarUserArea">
+      <span class="sidebar-user-name">未登录</span>
+    </div>
+  </aside>
+
+  <!-- 主区域 -->
+  <div class="main-wrapper">
+    <header class="topbar">
+      <h1 class="topbar-title">番茄钟</h1>
+      <div class="topbar-right">
+        <span class="topbar-date" id="currentDate"></span>
+      </div>
+    </header>
+
+    <main class="content">
+      <!-- 计时器 -->
+      <div class="card">
+        <div class="pomodoro-timer">
+          <div class="pomodoro-clock" id="pomodoroClock">
+            <span style="font-size:36px;">🍅</span>
+            <span class="pomodoro-time" id="pomodoroTime">25:00</span>
+            <span class="pomodoro-label" id="pomodoroStatus">准备开始</span>
+          </div>
+          <div class="pomodoro-controls">
+            <button class="btn btn-primary btn-lg" id="btnStart" onclick="startTimer()">▶ 开始</button>
+            <button class="btn btn-outline btn-lg" id="btnPause" onclick="pauseTimer()" style="display:none;">⏸ 暂停</button>
+            <button class="btn btn-outline btn-lg" id="btnReset" onclick="resetTimer()">🔄 重置</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 今日统计 -->
+      <div class="stat-grid" id="pomodoroStats">
+        <div class="stat-card">
+          <div class="stat-icon">🍅</div>
+          <div class="stat-value" id="statCount">0</div>
+          <div class="stat-label">今日番茄数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">⏱️</div>
+          <div class="stat-value" id="statMinutes">0 min</div>
+          <div class="stat-label">总专注时长</div>
+        </div>
+      </div>
+
+      <!-- 今日记录 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">📋 今日番茄记录</h2>
+          <button class="btn btn-outline btn-sm" onclick="loadTodayRecords()">🔄 刷新</button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>序号</th>
+                <th>开始时间</th>
+                <th>时长（分钟）</th>
+              </tr>
+            </thead>
+            <tbody id="pomodoroRecords">
+              <tr>
+                <td colspan="3" style="text-align:center;color:var(--text-muted);">
+                  暂无记录，开始你的第一个番茄钟吧！
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/auth.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/api.js"></script>
+  <script>
+    Auth.guard();
+    Auth.renderSidebarUser();
+    // 计时器状态
+    const DEFAULT_MINUTES = 25;
+    let totalSeconds = DEFAULT_MINUTES * 60;
+    let remainingSeconds = totalSeconds;
+    let timerId = null;
+    let isRunning = false;
+    let isCompleted = false; // 防止 onTimerComplete 重复触发
+
+    // DOM 引用
+    const timeEl = document.getElementById('pomodoroTime');
+    const statusEl = document.getElementById('pomodoroStatus');
+    const clockEl = document.getElementById('pomodoroClock');
+    const btnStart = document.getElementById('btnStart');
+    const btnPause = document.getElementById('btnPause');
+    const btnReset = document.getElementById('btnReset');
+
+    document.getElementById('currentDate').textContent = today();
+    loadTodayRecords();
+
+    // ── 计时器逻辑 ──
+
+    function formatTime(seconds) {
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+
+    function updateDisplay() {
+      timeEl.textContent = formatTime(remainingSeconds);
+
+      // 进度环效果：边框颜色随剩余时间变化
+      const ratio = remainingSeconds / totalSeconds;
+      if (ratio < 0.2) {
+        clockEl.style.borderColor = 'var(--danger)';
+      } else if (ratio < 0.5) {
+        clockEl.style.borderColor = 'var(--warning)';
+      } else {
+        clockEl.style.borderColor = 'var(--primary)';
+      }
+    }
+
+    function startTimer() {
+      if (isRunning) return;
+      isRunning = true;
+      statusEl.textContent = '专注中...';
+      btnStart.style.display = 'none';
+      btnPause.style.display = 'inline-flex';
+
+      timerId = setInterval(() => {
+        remainingSeconds--;
+        updateDisplay();
+
+        if (remainingSeconds <= 0 && !isCompleted) {
+          isCompleted = true;
+          clearInterval(timerId);
+          timerId = null;
+          isRunning = false;
+          // 提前重置秒数，防止 async 延迟期间再次命中 <=0
+          remainingSeconds = totalSeconds;
+          onTimerComplete();
+        }
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      if (!isRunning) return;
+      clearInterval(timerId);
+      timerId = null;
+      isRunning = false;
+      statusEl.textContent = '已暂停';
+      btnPause.style.display = 'none';
+      btnStart.style.display = 'inline-flex';
+      btnStart.textContent = '▶ 继续';
+    }
+
+    function resetTimer() {
+      if (timerId) {
+        clearInterval(timerId);
+        timerId = null;
+      }
+      isRunning = false;
+      isCompleted = false;
+      remainingSeconds = totalSeconds;
+      statusEl.textContent = '准备开始';
+      btnStart.style.display = 'inline-flex';
+      btnStart.textContent = '▶ 开始';
+      btnPause.style.display = 'none';
+      clockEl.style.borderColor = 'var(--primary)';
+      updateDisplay();
+    }
+
+    async function onTimerComplete() {
+      statusEl.textContent = '完成！';
+      btnPause.style.display = 'none';
+      btnStart.style.display = 'inline-flex';
+      btnStart.textContent = '▶ 开始';
+      clockEl.style.borderColor = 'var(--success)';
+
+      // 记录到后端
+      try {
+        await recordPomodoro(DEFAULT_MINUTES);
+        showToast('番茄钟完成！🎉', 'success');
+      } catch (e) {
+        // Mock 模式
+        if (!MOCK.pomodoroToday) MOCK.pomodoroToday = [];
+        const now = new Date();
+        const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+        MOCK.pomodoroToday.push({
+          id: Date.now(),
+          duration: DEFAULT_MINUTES,
+          start_time: timeStr,
+          date: today()
+        });
+        showToast('番茄钟完成！（模拟）🎉', 'success');
+      }
+
+      updateDisplay();
+      loadTodayRecords();
+    }
+
+    // ── 今日记录 ──
+
+    async function loadTodayRecords() {
+      try {
+        const data = await getTodayPomodoros();
+        renderRecords(data.records || []);
+      } catch (e) {
+        renderRecords(MOCK.pomodoroToday || []);
+      }
+    }
+
+    function renderRecords(records) {
+      const tbody = document.getElementById('pomodoroRecords');
+
+      // 更新统计
+      const count = records.length;
+      const totalMin = records.reduce((sum, r) => sum + (r.duration || 0), 0);
+      document.getElementById('statCount').textContent = count;
+      document.getElementById('statMinutes').textContent = totalMin + ' min';
+
+      if (!records.length) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);">暂无记录，开始你的第一个番茄钟吧！</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = records.map((r, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td>${r.start_time || '-'}</td>
+          <td>${r.duration || '-'} 分钟</td>
+        </tr>
+      `).join('');
+    }
+
+    // ── 页面卸载时清理计时器 ──
+    window.addEventListener('beforeunload', () => {
+      if (timerId) clearInterval(timerId);
+    });
+  </script>
+</body>
+</html>

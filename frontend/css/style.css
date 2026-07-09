@@ -250,16 +250,14 @@ a:hover {
   flex-direction: column;
   background:
     linear-gradient(rgba(240, 242, 245, 0.55), rgba(240, 242, 245, 0.55)),
-    url('../images/bg-structure.png') center / contain fixed no-repeat;
+    url('../images/bg-structure.jpg') center / cover no-repeat;
   background-color: #f0f2f5;
 }
 
 /* 顶部导航栏 */
 .topbar {
   height: var(--topbar-height);
-  background: rgba(255, 255, 255, 0.70);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(255, 255, 255, 0.75);
   border-bottom: 1px solid rgba(255, 255, 255, 0.4);
   display: flex;
   align-items: center;
@@ -300,9 +298,7 @@ a:hover {
 
 /* 卡片 */
 .card {
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(255, 255, 255, 0.78);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   padding: var(--space-lg);
@@ -567,9 +563,7 @@ tbody tr:hover {
   gap: var(--space-md);
 }
 .stat-card {
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(255, 255, 255, 0.78);
   border-radius: var(--radius-md);
   padding: var(--space-lg);
   box-shadow: var(--shadow-sm);
@@ -631,6 +625,42 @@ tbody tr:hover {
 }
 .calendar-day.other-month {
   color: var(--text-muted);
+}
+
+/* ── 番茄钟计时器 ── */
+.pomodoro-timer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--space-xl) 0;
+}
+.pomodoro-clock {
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  border: 6px solid var(--primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  background: var(--primary-light);
+  transition: border-color 0.5s ease;
+}
+.pomodoro-time {
+  font-size: 42px;
+  font-weight: 700;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+.pomodoro-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+.pomodoro-controls {
+  display: flex;
+  gap: var(--space-md);
 }
 
 /* ── 表格斑马纹 ── */
@@ -988,5 +1018,43 @@ tbody tr:nth-child(even) {
   thead th,
   tbody td {
     padding: 8px 10px;
+  }
+}
+
+/* ============================================
+   侧边栏用户信息区域
+   ============================================ */
+.sidebar-user {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sidebar-user .sidebar-user-name {
+  color: #ccc;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-user .sidebar-user-logout {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  text-decoration: none;
+}
+.sidebar-user .sidebar-user-logout:hover {
+  color: var(--danger);
+}
+
+@media (max-width: 768px) {
+  .sidebar-user {
+    display: none;
   }
 }

@@ -34,7 +34,14 @@
         <span class="nav-icon">🔔</span>
         <span class="nav-label">提醒中心</span>
       </a>
+      <a class="nav-item" href="pomodoro.html">
+        <span class="nav-icon">🍅</span>
+        <span class="nav-label">番茄钟</span>
+      </a>
     </nav>
+    <div class="sidebar-user" id="sidebarUserArea">
+      <span class="sidebar-user-name">未登录</span>
+    </div>
   </aside>
 
   <!-- 主区域 -->
@@ -85,20 +92,18 @@
     </main>
   </div>
 
+  <script src="../js/auth.js"></script>
   <script src="../js/utils.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/navigation.js"></script>
   <script>
+    Auth.guard();
+    Auth.renderSidebarUser();
     let currentFilter = 'all';
 
     document.getElementById('currentDate').textContent = today();
 
     async function loadReminders() {
-      // 先展示 MOCK 数据，秒开
-      renderReminders('due', MOCK.reminders.due);
-      renderReminders('review', MOCK.reminders.review);
-
-      // 同时请求后端
       try {
         const [dueData, reviewData] = await Promise.all([
           getReminders('due'),
@@ -106,7 +111,10 @@
         ]);
         renderReminders('due', dueData.reminders || []);
         renderReminders('review', reviewData.reminders || []);
-      } catch (e) { /* MOCK 已在展示 */ }
+      } catch (e) {
+        renderReminders('due', MOCK.reminders.due);
+        renderReminders('review', MOCK.reminders.review);
+      }
     }
 
     function renderReminders(type, reminders) {

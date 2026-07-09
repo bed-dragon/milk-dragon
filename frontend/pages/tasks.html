@@ -34,7 +34,14 @@
         <span class="nav-icon">🔔</span>
         <span class="nav-label">提醒中心</span>
       </a>
+      <a class="nav-item" href="pomodoro.html">
+        <span class="nav-icon">🍅</span>
+        <span class="nav-label">番茄钟</span>
+      </a>
     </nav>
+    <div class="sidebar-user" id="sidebarUserArea">
+      <span class="sidebar-user-name">未登录</span>
+    </div>
   </aside>
 
   <!-- 主区域 -->
@@ -132,24 +139,29 @@
     </main>
   </div>
 
+  <script src="../js/auth.js"></script>
   <script src="../js/utils.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/navigation.js"></script>
   <script>
+    Auth.guard();
+    Auth.renderSidebarUser();
     let editingId = null;
 
     document.getElementById('currentDate').textContent = today();
 
-    // 加载任务列表（先展示 MOCK，再请求后端）
+    // 加载任务列表
     async function loadTasks() {
-      renderTasks(MOCK.tasks);
       try {
         const data = await getTasks();
         renderTasks(data.tasks || []);
-      } catch (e) { /* MOCK 已在展示 */ }
+      } catch (e) {
+        renderTasks(MOCK.tasks);
+      }
     }
 
     function renderTasks(tasks) {
+      window._tasks = tasks;
       const tbody = document.getElementById('taskList');
       if (!tasks.length) {
         tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">暂无任务</td></tr>';
@@ -256,13 +268,14 @@
       }
     }
 
-    // 推荐任务（先展示 MOCK，再请求后端）
+    // 推荐任务
     async function loadRecommended() {
-      renderRecommended(MOCK.recommended);
       try {
         const data = await getRecommended();
         renderRecommended(data.tasks || []);
-      } catch (e) { /* MOCK 已在展示 */ }
+      } catch (e) {
+        renderRecommended(MOCK.recommended);
+      }
     }
 
     function renderRecommended(tasks) {

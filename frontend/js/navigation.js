@@ -5,36 +5,36 @@
 (function() {
   'use strict';
 
+  // 检测是否以 file:// 协议打开（本地文件），
+  // 此时跳过 prefetch/preload，避免浏览器安全警告
+  var isFileProtocol = window.location.protocol === 'file:';
+
   // ═══════════════════════════════════════
   // 1. Hover 预加载（鼠标悬停时就开始加载页面）
   // ═══════════════════════════════════════
   function initPrefetch() {
-    const navLinks = document.querySelectorAll('.nav-item');
+    // file:// 协议下跳过，prefetch 会触发浏览器安全警告
+    if (isFileProtocol) return;
+
+    var navLinks = document.querySelectorAll('.nav-item');
     if (!navLinks.length) return;
 
-    navLinks.forEach(link => {
-      let prefetched = false;
+    navLinks.forEach(function(link) {
+      var prefetched = false;
 
-      link.addEventListener('mouseenter', () => {
+      link.addEventListener('mouseenter', function() {
         if (prefetched) return;
         prefetched = true;
 
-        const url = link.getAttribute('href');
-        if (!url || url === '#' || url.startsWith('javascript:')) return;
+        var url = link.getAttribute('href');
+        if (!url || url === '#' || url.indexOf('javascript:') === 0) return;
 
-        // 方式 1: <link rel="prefetch">（浏览器空闲时加载）
-        const prefetchLink = document.createElement('link');
-        prefetchLink.rel = 'prefetch';
-        prefetchLink.href = url;
-        document.head.appendChild(prefetchLink);
-
-        // 方式 2: fetch 预加载（更激进，兼容性更好）
+        // <link rel="prefetch"> 让浏览器空闲时预加载
         try {
-          const fetchLink = document.createElement('link');
-          fetchLink.rel = 'preload';
-          fetchLink.as = 'document';
-          fetchLink.href = url;
-          document.head.appendChild(fetchLink);
+          var prefetchLink = document.createElement('link');
+          prefetchLink.rel = 'prefetch';
+          prefetchLink.href = url;
+          document.head.appendChild(prefetchLink);
         } catch (e) { /* 忽略 */ }
       }, { once: true });
     });
@@ -93,13 +93,15 @@
   // 3. 页面加载完成后添加 prefetch link 标签（资源提示）
   // ═══════════════════════════════════════
   function addPrefetchHints() {
+    // file:// 协议下跳过
+    if (isFileProtocol) return;
     // 根据当前页面，预加载其他页面
     const currentPath = window.location.pathname;
     const isInPages = currentPath.includes('/pages/');
 
     const pages = isInPages
-      ? ['../index.html', 'checkin.html', 'stats.html', 'reminders.html', 'tasks.html']
-      : ['pages/tasks.html', 'pages/checkin.html', 'pages/stats.html', 'pages/reminders.html'];
+      ? ['../index.html', 'checkin.html', 'stats.html', 'reminders.html', 'tasks.html', 'pomodoro.html']
+      : ['pages/tasks.html', 'pages/checkin.html', 'pages/stats.html', 'pages/reminders.html', 'pages/pomodoro.html'];
 
     // 排除当前页面
     const currentPage = currentPath.split('/').pop() || 'index.html';

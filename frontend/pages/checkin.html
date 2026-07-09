@@ -34,7 +34,14 @@
         <span class="nav-icon">🔔</span>
         <span class="nav-label">提醒中心</span>
       </a>
+      <a class="nav-item" href="pomodoro.html">
+        <span class="nav-icon">🍅</span>
+        <span class="nav-label">番茄钟</span>
+      </a>
     </nav>
+    <div class="sidebar-user" id="sidebarUserArea">
+      <span class="sidebar-user-name">未登录</span>
+    </div>
   </aside>
 
   <!-- 主区域 -->
@@ -118,10 +125,13 @@
     </main>
   </div>
 
+  <script src="../js/auth.js"></script>
   <script src="../js/utils.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/navigation.js"></script>
   <script>
+    Auth.guard();
+    Auth.renderSidebarUser();
     let currentMonth = new Date().getMonth();
     let currentYear = new Date().getFullYear();
     let checkinDates = new Set();
@@ -144,18 +154,19 @@
       loadCheckinData();
     }
 
-    // 加载打卡数据（先展示 MOCK，再请求后端）
+    // 加载打卡数据
     async function loadCheckinData() {
       const date = document.getElementById('checkinDate').value;
-      const mockCheckins = MOCK.checkins[date] || [];
-      renderTodayTasks(MOCK.tasks, mockCheckins);
       try {
         const [tasksData, checkinData] = await Promise.all([
           getTasks(),
           getCheckins(date)
         ]);
         renderTodayTasks(tasksData.tasks || [], checkinData.checkins || []);
-      } catch (e) { /* MOCK 已在展示 */ }
+      } catch (e) {
+        const mockCheckins = MOCK.checkins[date] || [];
+        renderTodayTasks(MOCK.tasks, mockCheckins);
+      }
     }
 
     function renderTodayTasks(tasks, checkins) {

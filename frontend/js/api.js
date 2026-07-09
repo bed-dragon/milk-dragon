@@ -6,10 +6,13 @@
  * 1. 后端未就绪时，页面使用 MOCK 数据自动展示
  * 2. 后端接口完成后，函数会自动请求真实接口
  * 3. 如果请求失败，自动降级到模拟数据
+ *
+ * 响应格式约定：后端统一返回 { ok: true/false, data: ... }
+ * 每个 wrapper 函数负责解包 data 字段，返回页面期望的格式
  */
 
 const API_BASE = 'http://localhost:8080';
-const REQUEST_TIMEOUT = 2000; // 2 秒超时，快速降级到 MOCK
+const REQUEST_TIMEOUT = 8000; // 8 秒超时，给后端充足时间
 
 /**
  * 通用请求函数（带超时）
@@ -19,18 +22,33 @@ async function request(method, path, body = null) {
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
   try {
+    const headers = { 'Content-Type': 'application/json' };
+    // 自动附加 Authorization header
+    if (typeof Auth !== 'undefined' && Auth.getToken()) {
+      headers['Authorization'] = 'Bearer ' + Auth.getToken();
+    }
+
     const options = {
       method: method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       signal: controller.signal,
     };
     if (body) options.body = JSON.stringify(body);
 
     const res = await fetch(API_BASE + path, options);
+
+    // 401 未认证 — 清除登录状态并跳转
+    if (res.status === 401) {
+      if (typeof Auth !== 'undefined') Auth.clear();
+      const prefix = window.location.pathname.includes('/pages/') ? '../' : '';
+      window.location.href = prefix + 'login.html';
+      throw new Error('请先登录');
+    }
+
     const data = await res.json();
 
     if (!data.ok && data.ok !== undefined) {
-      throw new Error(data.error || '请求失败');
+      throw new Error(data.error || data.msg || '请求失败');
     }
     return data;
   } finally {
@@ -42,8 +60,10 @@ async function request(method, path, body = null) {
 // 任务 API
 // ═══════════════════════════════════
 
-function getTasks() {
-  return request('GET', '/api/tasks');
+/** 获取任务列表 → { tasks: [...] } */
+async function getTasks() {
+  const data = await request('GET', '/api/tasks');
+  return { tasks: data.data || [] };
 }
 
 function createTask(task) {
@@ -58,8 +78,10 @@ function _deleteTask(id) {
   return request('DELETE', `/api/tasks/${id}`);
 }
 
-function getRecommended() {
-  return request('GET', '/api/tasks/recommended');
+/** 获取推荐任务 → { tasks: [...] } */
+async function getRecommended() {
+  const data = await request('GET', '/api/recommended_tasks');
+  return { tasks: data.data || [] };
 }
 
 // ═══════════════════════════════════
@@ -70,48 +92,116 @@ function _doCheckin(taskId, date) {
   return request('POST', '/api/checkin', { task_id: taskId, date: date });
 }
 
-function getCheckins(dateOrTaskId) {
-  // 判断传入的是日期还是 task_id
+/** 查询打卡记录 → { checkins: [...] } */
+async function getCheckins(dateOrTaskId) {
+  let data;
   if (typeof dateOrTaskId === 'number' || /^\d+$/.test(dateOrTaskId)) {
-    return request('GET', `/api/checkin?task_id=${dateOrTaskId}`);
+    data = await request('GET', `/api/checkin?task_id=${dateOrTaskId}`);
+  } else {
+    data = await request('GET', `/api/checkin?date=${dateOrTaskId}`);
   }
-  return request('GET', `/api/checkin?date=${dateOrTaskId}`);
+  return { checkins: data.data || [] };
 }
 
-function getStreak() {
-  return request('GET', '/api/checkin/streak');
+/** 获取连续打卡天数 → { streak: N } */
+async function getStreak() {
+  const data = await request('POST', '/api/signins', { date: today() });
+  const inner = data.data || {};
+  return { streak: inner.streak || 0 };
 }
 
 // ═══════════════════════════════════
 // 统计分析 API
 // ═══════════════════════════════════
 
-function getOverview() {
-  return request('GET', '/api/stats/overview');
+/** 获取总览统计 → { total_tasks, completed, rate, streak } */
+async function getOverview() {
+  const data = await request('GET', '/api/stats/overview');
+  const d = data.data || {};
+  return {
+    total_tasks: d.total_tasks || 0,
+    completed: d.completed || 0,
+    rate: d.completion_rate || d.rate || 0,
+    streak: d.streak || 0,
+  };
 }
 
-function getDailyStats(start, end) {
-  return request('GET', `/api/stats/daily?start=${start}&end=${end}`);
+/** 获取每日统计 → { daily: [...] } */
+async function getDailyStats(start, end) {
+  const data = await request('GET', `/api/stats/daily?start=${start}&end=${end}`);
+  return { daily: data.data || [] };
 }
 
-function getWeeklyStats(week) {
-  return request('GET', `/api/stats/weekly?week=${week}`);
+/** 获取每周统计 → { daily: [...] } */
+async function getWeeklyStats(week) {
+  const data = await request('GET', `/api/stats/weekly?week=${week}`);
+  return { daily: data.data || [] };
 }
 
-function getMonthlyStats(month) {
-  return request('GET', `/api/stats/monthly?month=${month}`);
+/** 获取每月统计 → { daily: [...] } */
+async function getMonthlyStats(month) {
+  const data = await request('GET', `/api/stats/monthly?month=${month}`);
+  return { daily: data.data || [] };
 }
 
 // ═══════════════════════════════════
 // 提醒 API
 // ═══════════════════════════════════
 
-function getReminders(type = '') {
-  return request('GET', `/api/reminders?type=${type}`);
+/** 获取提醒列表 → { reminders: [...] } */
+async function getReminders(type = '') {
+  const data = await request('GET', `/api/reminders?type=${type}`);
+  return { reminders: data.data || [] };
 }
 
+/** 标记提醒已读 */
 function markReminderRead(id) {
-  return request('PUT', `/api/reminders/${id}/read`);
+  return request('POST', '/api/reminders/mark_read', { reminder_id: id });
+}
+
+// ═══════════════════════════════════
+// 番茄钟 API
+// ═══════════════════════════════════
+
+/** 记录一次番茄钟 */
+function recordPomodoro(duration) {
+  return request('POST', '/api/pomodoro', { duration: duration });
+}
+
+/** 获取今日番茄钟记录 → { records: [...] } */
+async function getTodayPomodoros() {
+  const data = await request('GET', '/api/pomodoro/today');
+  return { records: data.data || [] };
+}
+
+// ═══════════════════════════════════
+// 名言 API
+// ═══════════════════════════════════
+
+/** 获取随机名言 → { content, author } */
+async function getRandomQuote() {
+  const data = await request('GET', '/api/quotes/random');
+  const d = data.data || {};
+  return { content: d.content || '', author: d.author || '佚名' };
+}
+
+// ═══════════════════════════════════
+// 认证 API
+// ═══════════════════════════════════
+
+/** 登录 → { token, user_id, ... } */
+async function login(username, password) {
+  return await request('POST', '/api/auth/login', { username, password });
+}
+
+/** 注册（成功后自动返回 token）→ { token, user_id, username } */
+async function register(username, password, nickname) {
+  return await request('POST', '/api/auth/register', { username, password, nickname });
+}
+
+/** 获取当前用户信息 → { id, username, nickname, signature, created_at } */
+async function getMe() {
+  return await request('GET', '/api/me');
 }
 
 // ═══════════════════════════════════
@@ -186,4 +276,19 @@ const MOCK = {
       { id: 5, task_title: '阅读课外书 30 分钟', type: 'review', urgency: 'low', remind_date: '2026-07-08', is_read: 1 },
     ],
   },
+
+  // ── 番茄钟 ──
+  pomodoroToday: [],
+
+  // ── 名言 ──
+  quotes: [
+    { content: '学而不思则罔，思而不学则殆。', author: '孔子' },
+    { content: '天才是百分之一的灵感，加上百分之九十九的汗水。', author: '爱迪生' },
+    { content: '学习知识要善于思考，思考，再思考。', author: '爱因斯坦' },
+    { content: '千里之行，始于足下。', author: '老子' },
+    { content: '读书破万卷，下笔如有神。', author: '杜甫' },
+    { content: '知识就是力量。', author: '培根' },
+    { content: '活着就要学习，学习不是为了活着。', author: '培根' },
+    { content: '温故而知新，可以为师矣。', author: '孔子' },
+  ],
 };

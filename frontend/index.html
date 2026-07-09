@@ -34,7 +34,15 @@
         <span class="nav-icon">🔔</span>
         <span class="nav-label">提醒中心</span>
       </a>
+      <a class="nav-item" href="pages/pomodoro.html">
+        <span class="nav-icon">🍅</span>
+        <span class="nav-label">番茄钟</span>
+      </a>
     </nav>
+    <div class="sidebar-user" id="sidebarUserArea">
+      <span class="sidebar-user-name">未登录</span>
+      <a class="sidebar-user-logout" onclick="Auth.logout()" title="退出登录">🚪 退出登录</a>
+    </div>
   </aside>
 
   <!-- 主区域 -->
@@ -68,6 +76,22 @@
           <div class="stat-icon">🔥</div>
           <div class="stat-value" id="streakDays">0</div>
           <div class="stat-label">连续打卡天数</div>
+        </div>
+      </div>
+
+      <!-- 每日名言 -->
+      <div class="card" id="quoteCard" style="border-left: 4px solid var(--secondary);">
+        <div style="display:flex;align-items:flex-start;gap:var(--space-md);">
+          <span style="font-size:32px;">💬</span>
+          <div style="flex:1;">
+            <blockquote id="quoteContent" style="margin:0 0 var(--space-sm) 0;font-size:var(--font-size-lg);font-style:italic;color:var(--text-primary);line-height:1.6;">
+              加载中...
+            </blockquote>
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <cite id="quoteAuthor" style="font-size:var(--font-size-sm);color:var(--text-secondary);font-style:normal;">— </cite>
+              <button class="btn btn-sm btn-outline" onclick="loadQuote()" title="换一句">🔄 换一句</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -113,24 +137,20 @@
     </main>
   </div>
 
+  <script src="js/auth.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/api.js"></script>
   <script src="js/navigation.js"></script>
   <script>
+    Auth.guard();
+    Auth.renderSidebarUser();
     document.getElementById('currentDate').textContent = today();
 
     // ═══════════════════════════════════
     // 仪表盘数据加载（先展示 MOCK，再尝试请求后端）
     // ═══════════════════════════════════
     async function loadDashboard() {
-      // 先展示 MOCK 数据，秒开
-      const allReminders = [...(MOCK.reminders.due || []), ...(MOCK.reminders.review || [])];
-      renderOverview(MOCK.overview);
-      renderReminders(allReminders);
-      renderRecentTasks(MOCK.tasks);
-      checkReminderNotification(allReminders);
-
-      // 同时尝试请求后端，成功后无缝更新
+      // 先请求后端，失败才用 MOCK
       try {
         const [overview, reminders, tasks] = await Promise.all([
           getOverview(),
@@ -138,11 +158,16 @@
           getTasks()
         ]);
         renderOverview(overview);
-        renderReminders(reminders.reminders || []);
+        const allReminders = reminders.reminders || [];
+        renderReminders(allReminders);
         renderRecentTasks(tasks.tasks || []);
-        checkReminderNotification(reminders.reminders || []);
+        checkReminderNotification(allReminders);
       } catch (e) {
-        // MOCK 数据已经在展示，无需处理
+        const allReminders = [...(MOCK.reminders.due || []), ...(MOCK.reminders.review || [])];
+        renderOverview(MOCK.overview);
+        renderReminders(allReminders);
+        renderRecentTasks(MOCK.tasks);
+        checkReminderNotification(allReminders);
       }
     }
 
@@ -288,8 +313,24 @@
     `;
     document.head.appendChild(styleSheet);
 
+    // ── 每日名言 ──
+    async function loadQuote() {
+      try {
+        const quote = await getRandomQuote();
+        document.getElementById('quoteContent').textContent = `"${quote.content}"`;
+        document.getElementById('quoteAuthor').textContent = `— ${quote.author}`;
+      } catch (e) {
+        // 从 MOCK 随机取一条
+        const idx = Math.floor(Math.random() * MOCK.quotes.length);
+        const q = MOCK.quotes[idx];
+        document.getElementById('quoteContent').textContent = `"${q.content}"`;
+        document.getElementById('quoteAuthor').textContent = `— ${q.author}`;
+      }
+    }
+
     // 启动
     loadDashboard();
+    loadQuote();
   </script>
 </body>
 </html>
