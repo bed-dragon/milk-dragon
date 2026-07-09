@@ -125,7 +125,7 @@ a:hover {
   left: 0;
   width: var(--sidebar-width);
   height: 100vh;
-  background: var(--bg-sidebar);
+  background: linear-gradient(180deg, #0f1a4a 0%, #1a2a6c 25%, #1e3a8a 45%, #1a2a5a 65%, #16162a 82%, #1e272e 100%);
   color: #fff;
   display: flex;
   flex-direction: column;
@@ -141,8 +141,22 @@ a:hover {
   font-size: var(--font-size-lg);
   font-weight: 700;
   letter-spacing: 0.5px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   flex-shrink: 0;
+}
+.sidebar-brand span:last-child {
+  background: linear-gradient(90deg, #ff4757, #ff9f00, #00d861, #2d7dff, #a855f7);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradientMove 4s ease infinite;
+}
+
+@keyframes gradientMove {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 .sidebar-brand .brand-icon {
   margin-right: var(--space-sm);
@@ -158,21 +172,68 @@ a:hover {
   display: flex;
   align-items: center;
   padding: 12px var(--space-lg);
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.8);
   font-size: var(--font-size-base);
   transition: all var(--transition);
   cursor: pointer;
   border-left: 3px solid transparent;
 }
 .nav-item:hover {
-  background: var(--bg-sidebar-hover);
+  background: rgba(255, 255, 255, 0.1);
   color: #fff;
 }
 .nav-item.active {
-  background: var(--bg-sidebar-active);
+  background: rgba(255, 255, 255, 0.12);
   color: #fff;
-  border-left-color: #fff;
 }
+
+/* 彩色导航：按钮静态带彩色左条 + 彩色文字 */
+.nav-item:nth-child(1) {
+  border-left-color: rgba(255, 71, 87, 0.4);
+  color: rgba(255, 160, 175, 0.9);
+}
+.nav-item:nth-child(2) {
+  border-left-color: rgba(255, 159, 0, 0.4);
+  color: rgba(255, 200, 100, 0.9);
+}
+.nav-item:nth-child(3) {
+  border-left-color: rgba(0, 216, 97, 0.4);
+  color: rgba(100, 230, 160, 0.9);
+}
+.nav-item:nth-child(4) {
+  border-left-color: rgba(45, 125, 255, 0.4);
+  color: rgba(140, 185, 255, 0.9);
+}
+.nav-item:nth-child(5) {
+  border-left-color: rgba(168, 85, 247, 0.4);
+  color: rgba(200, 160, 255, 0.9);
+}
+.nav-item:nth-child(6) {
+  border-left-color: rgba(255, 71, 87, 0.4);
+  color: rgba(255, 160, 175, 0.9);
+}
+
+/* 图标颜色 */
+.nav-item:nth-child(1) .nav-icon { color: #ff4757; }
+.nav-item:nth-child(2) .nav-icon { color: #ff9f00; }
+.nav-item:nth-child(3) .nav-icon { color: #00d861; }
+.nav-item:nth-child(4) .nav-icon { color: #2d7dff; }
+.nav-item:nth-child(5) .nav-icon { color: #a855f7; }
+.nav-item:nth-child(6) .nav-icon { color: #ff4757; }
+
+/* 悬停/激活：左条变实色 + 文字变白 + 背景光晕 */
+.nav-item:nth-child(1):hover,
+.nav-item:nth-child(1).active { border-left-color: #ff4757; color: #fff; background: rgba(255, 71, 87, 0.25); }
+.nav-item:nth-child(2):hover,
+.nav-item:nth-child(2).active { border-left-color: #ff9f00; color: #fff; background: rgba(255, 159, 0, 0.25); }
+.nav-item:nth-child(3):hover,
+.nav-item:nth-child(3).active { border-left-color: #00d861; color: #fff; background: rgba(0, 216, 97, 0.25); }
+.nav-item:nth-child(4):hover,
+.nav-item:nth-child(4).active { border-left-color: #2d7dff; color: #fff; background: rgba(45, 125, 255, 0.25); }
+.nav-item:nth-child(5):hover,
+.nav-item:nth-child(5).active { border-left-color: #a855f7; color: #fff; background: rgba(168, 85, 247, 0.25); }
+.nav-item:nth-child(6):hover,
+.nav-item:nth-child(6).active { border-left-color: #ff4757; color: #fff; background: rgba(255, 71, 87, 0.25); }
 .nav-item .nav-icon {
   margin-right: var(--space-md);
   font-size: var(--font-size-lg);
@@ -187,13 +248,19 @@ a:hover {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background:
+    linear-gradient(rgba(240, 242, 245, 0.55), rgba(240, 242, 245, 0.55)),
+    url('../images/bg-structure.png') center / contain fixed no-repeat;
+  background-color: #f0f2f5;
 }
 
 /* 顶部导航栏 */
 .topbar {
   height: var(--topbar-height);
-  background: var(--bg-card);
-  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.70);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -233,12 +300,14 @@ a:hover {
 
 /* 卡片 */
 .card {
-  background: var(--bg-card);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   padding: var(--space-lg);
   margin-bottom: var(--space-lg);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
 .card-header {
@@ -247,7 +316,7 @@ a:hover {
   justify-content: space-between;
   margin-bottom: var(--space-md);
   padding-bottom: var(--space-md);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid rgba(225, 228, 232, 0.5);
 }
 
 .card-title {
@@ -359,22 +428,22 @@ table {
   border-collapse: collapse;
 }
 thead th {
-  background: var(--bg-body);
+  background: rgba(240, 242, 245, 0.50);
   padding: 10px 12px;
   text-align: left;
   font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--text-secondary);
-  border-bottom: 2px solid var(--border);
+  border-bottom: 2px solid rgba(225, 228, 232, 0.5);
   white-space: nowrap;
 }
 tbody td {
   padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid rgba(225, 228, 232, 0.4);
   font-size: var(--font-size-base);
 }
 tbody tr:hover {
-  background: #f8f9fa;
+  background: rgba(248, 249, 250, 0.6);
 }
 
 /* 标签/徽章 */
@@ -498,11 +567,13 @@ tbody tr:hover {
   gap: var(--space-md);
 }
 .stat-card {
-  background: var(--bg-card);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   border-radius: var(--radius-md);
   padding: var(--space-lg);
   box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.4);
 }
 .stat-card .stat-icon {
   font-size: 28px;
@@ -564,7 +635,7 @@ tbody tr:hover {
 
 /* ── 表格斑马纹 ── */
 tbody tr:nth-child(even) {
-  background: #f8f9fa;
+  background: rgba(248, 249, 250, 0.35);
 }
 
 /* ── 卡片悬浮效果 ── */
