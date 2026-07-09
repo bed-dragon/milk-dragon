@@ -154,18 +154,19 @@
       loadCheckinData();
     }
 
-    // 加载打卡数据（先展示 MOCK，再请求后端）
+    // 加载打卡数据
     async function loadCheckinData() {
       const date = document.getElementById('checkinDate').value;
-      const mockCheckins = MOCK.checkins[date] || [];
-      renderTodayTasks(MOCK.tasks, mockCheckins);
       try {
         const [tasksData, checkinData] = await Promise.all([
           getTasks(),
           getCheckins(date)
         ]);
         renderTodayTasks(tasksData.tasks || [], checkinData.checkins || []);
-      } catch (e) { /* MOCK 已在展示 */ }
+      } catch (e) {
+        const mockCheckins = MOCK.checkins[date] || [];
+        renderTodayTasks(MOCK.tasks, mockCheckins);
+      }
     }
 
     function renderTodayTasks(tasks, checkins) {
