@@ -3,6 +3,7 @@
 #include "db.h"
 #include "json.hpp"
 #include "routes_tasks.h"
+#include "routes_auth.h"
 
 using namespace httplib;
 using json = nlohmann::json;
@@ -44,17 +45,33 @@ int main() {
     svr.Put(R"(/api/tasks/(\d+))",     handle_update_task);
     svr.Delete(R"(/api/tasks/(\d+))",  handle_delete_task);
 
-    // 辅助：从请求中获取 user_id（暂默认 1，等 auth 模块完成后从 token 解析）
+    // 辅助：从请求中获取 user_id（优先从 Authorization Bearer token 解析）
     auto get_uid = [](const Request& req) -> int {
+        if (req.has_header("Authorization")) {
+            string auth = req.get_header_value("Authorization");
+            if (auth.rfind("Bearer ", 0) == 0) {
+                return user_id_by_token(auth.substr(7));
+            }
+        }
+        // 兼容旧方式：query param ?user_id=
         if (req.has_param("user_id")) return stoi(req.get_param_value("user_id"));
-        return 1;  // 默认用户 ID
+        return -1;  // 未认证
     };
+
+    // 辅助宏：检查登录状态，未登录返回 401
+    #define REQUIRE_AUTH(uid_var) \
+        int uid_var = get_uid(req); \
+        if (uid_var <= 0) { \
+            res.status = 401; \
+            res.set_content(R"({"ok":false,"error":"请先登录"})", "application/json"); \
+            return; \
+        }
 
     // ---------------- 签到/打卡接口（真实数据库操作） ----------------
 
     // GET /api/checkin — 查询打卡记录（支持 ?date= 和 ?task_id=）
     svr.Get("/api/checkin", [&](const Request& req, Response& res) {
-        int user_id = get_uid(req);
+        REQUIRE_AUTH(user_id);
         string data_str;
 
         if (req.has_param("task_id")) {
@@ -73,7 +90,7 @@ int main() {
     svr.Post("/api/checkin", [&](const Request& req, Response& res) {
         try {
             json body = json::parse(req.body);
-            int user_id = body.value("user_id", 1);
+            REQUIRE_AUTH(user_id);
             int task_id = body.value("task_id", 0);
             string date = body.value("date", "");
 
@@ -100,14 +117,14 @@ int main() {
 
     // ---------------- 统计接口 ----------------
     svr.Get("/api/stats/overview", [&](const Request& req, Response& res) {
-        int user_id = get_uid(req);
+        REQUIRE_AUTH(user_id);
         string data_str = stats_overview(user_id);
         json resp = {{"ok", true}, {"data", json::parse(data_str)}};
         res.set_content(resp.dump(), "application/json");
     });
 
     svr.Get("/api/stats/daily", [&](const Request& req, Response& res) {
-        int user_id = get_uid(req);
+        REQUIRE_AUTH(user_id);
         string start = req.has_param("start") ? req.get_param_value("start") : "2026-07-01";
         string end   = req.has_param("end")   ? req.get_param_value("end")   : "2026-07-31";
         string data_str = stats_daily(user_id, start, end);
@@ -116,7 +133,7 @@ int main() {
     });
 
     svr.Get("/api/stats/weekly", [&](const Request& req, Response& res) {
-        int user_id = get_uid(req);
+        REQUIRE_AUTH(user_id);
         // weekly 复用 daily，取 7 天
         string week = req.has_param("week") ? req.get_param_value("week") : "2026-07-01";
         // 计算 week 的结束日期（+6 天）
@@ -132,7 +149,7 @@ int main() {
     });
 
     svr.Get("/api/stats/monthly", [&](const Request& req, Response& res) {
-        int user_id = get_uid(req);
+        REQUIRE_AUTH(user_id);
         string month = req.has_param("month") ? req.get_param_value("month") : "2026-07";
         string start = month + "-01";
         string end   = month + "-31";
@@ -143,7 +160,7 @@ int main() {
 
     // ---------------- 提醒接口（真实数据库操作） ----------------
     svr.Get("/api/reminders", [&](const Request& req, Response& res) {
-        int user_id = get_uid(req);
+        REQUIRE_AUTH(user_id);
         string filter_type = req.has_param("type") ? req.get_param_value("type") : "";
         string data_str = reminder_list(user_id, filter_type);
         json resp = {{"ok", true}, {"data", json::parse(data_str)}};
@@ -153,8 +170,8 @@ int main() {
     svr.Post("/api/reminders/mark_read", [&](const Request& req, Response& res) {
         try {
             json body = json::parse(req.body);
+            REQUIRE_AUTH(user_id);
             int reminder_id = body.value("reminder_id", 0);
-            int user_id = body.value("user_id", 1);
 
             if (reminder_id == 0) {
                 res.status = 400;
@@ -218,15 +235,10 @@ int main() {
     });
 
     // ---------------- 账号与用户 ----------------
-    svr.Post("/api/auth/register", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true,\"message\":\"registered (stub)\",\"data\":{\"user_id\":1}}", "application/json");
-    });
-    svr.Post("/api/auth/login", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true,\"token\":\"stub-token\"}", "application/json");
-    });
-    svr.Get(R"(/api/users/:id)", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true,\"data\":{\"id\":1,\"username\":\"user\"}}", "application/json");
-    });
+    svr.Post("/api/auth/register",  handle_register);
+    svr.Post("/api/auth/login",     handle_login);
+    svr.Get("/api/me",              handle_get_me);
+    svr.Get("/api/users/search",    handle_search_users);
 
     // ---------------- 好友与社交 ----------------
     svr.Post("/api/friends/request", [](const Request& req, Response& res) {
@@ -255,7 +267,7 @@ int main() {
 
     // ---------------- 签到历史与连续天数 ----------------
     svr.Get("/api/signins", [&](const Request& req, Response& res) {
-        int user_id = get_uid(req);
+        REQUIRE_AUTH(user_id);
         string data_str = signin_history(user_id);
         json resp = {{"ok", true}, {"data", json::parse(data_str)}};
         res.set_content(resp.dump(), "application/json");
@@ -263,7 +275,7 @@ int main() {
     svr.Post("/api/signins", [&](const Request& req, Response& res) {
         try {
             json body = json::parse(req.body);
-            int user_id = body.value("user_id", 1);
+            REQUIRE_AUTH(user_id);
             string date = body.value("date", "");
 
             if (date.empty()) {
@@ -285,7 +297,7 @@ int main() {
 
     // ---------------- 打卡记录（更细粒度） ----------------
     svr.Get("/api/checkins", [&](const Request& req, Response& res) {
-        int user_id = get_uid(req);
+        REQUIRE_AUTH(user_id);
         string date = req.has_param("date") ? req.get_param_value("date") : "";
         string data_str = checkin_get(user_id, date);
         json resp = {{"ok", true}, {"data", json::parse(data_str)}};
@@ -294,7 +306,7 @@ int main() {
     svr.Post("/api/checkins", [&](const Request& req, Response& res) {
         try {
             json body = json::parse(req.body);
-            int user_id = body.value("user_id", 1);
+            REQUIRE_AUTH(user_id);
             int task_id = body.value("task_id", 0);
             string date = body.value("date", "");
 

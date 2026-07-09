@@ -12,7 +12,7 @@
  */
 
 const API_BASE = 'http://localhost:8080';
-const REQUEST_TIMEOUT = 2000; // 2 秒超时，快速降级到 MOCK
+const REQUEST_TIMEOUT = 8000; // 8 秒超时，给后端充足时间
 
 /**
  * 通用请求函数（带超时）
@@ -22,18 +22,33 @@ async function request(method, path, body = null) {
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
   try {
+    const headers = { 'Content-Type': 'application/json' };
+    // 自动附加 Authorization header
+    if (typeof Auth !== 'undefined' && Auth.getToken()) {
+      headers['Authorization'] = 'Bearer ' + Auth.getToken();
+    }
+
     const options = {
       method: method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       signal: controller.signal,
     };
     if (body) options.body = JSON.stringify(body);
 
     const res = await fetch(API_BASE + path, options);
+
+    // 401 未认证 — 清除登录状态并跳转
+    if (res.status === 401) {
+      if (typeof Auth !== 'undefined') Auth.clear();
+      const prefix = window.location.pathname.includes('/pages/') ? '../' : '';
+      window.location.href = prefix + 'login.html';
+      throw new Error('请先登录');
+    }
+
     const data = await res.json();
 
     if (!data.ok && data.ok !== undefined) {
-      throw new Error(data.error || '请求失败');
+      throw new Error(data.error || data.msg || '请求失败');
     }
     return data;
   } finally {
@@ -90,7 +105,7 @@ async function getCheckins(dateOrTaskId) {
 
 /** 获取连续打卡天数 → { streak: N } */
 async function getStreak() {
-  const data = await request('POST', '/api/signins', { user_id: 1, date: today() });
+  const data = await request('POST', '/api/signins', { date: today() });
   const inner = data.data || {};
   return { streak: inner.streak || 0 };
 }
@@ -141,7 +156,7 @@ async function getReminders(type = '') {
 
 /** 标记提醒已读 */
 function markReminderRead(id) {
-  return request('POST', '/api/reminders/mark_read', { reminder_id: id, user_id: 1 });
+  return request('POST', '/api/reminders/mark_read', { reminder_id: id });
 }
 
 // ═══════════════════════════════════
@@ -150,7 +165,7 @@ function markReminderRead(id) {
 
 /** 记录一次番茄钟 */
 function recordPomodoro(duration) {
-  return request('POST', '/api/pomodoro', { user_id: 1, duration: duration });
+  return request('POST', '/api/pomodoro', { duration: duration });
 }
 
 /** 获取今日番茄钟记录 → { records: [...] } */
@@ -168,6 +183,25 @@ async function getRandomQuote() {
   const data = await request('GET', '/api/quotes/random');
   const d = data.data || {};
   return { content: d.content || '', author: d.author || '佚名' };
+}
+
+// ═══════════════════════════════════
+// 认证 API
+// ═══════════════════════════════════
+
+/** 登录 → { token, user_id, ... } */
+async function login(username, password) {
+  return await request('POST', '/api/auth/login', { username, password });
+}
+
+/** 注册（成功后自动返回 token）→ { token, user_id, username } */
+async function register(username, password, nickname) {
+  return await request('POST', '/api/auth/register', { username, password, nickname });
+}
+
+/** 获取当前用户信息 → { id, username, nickname, signature, created_at } */
+async function getMe() {
+  return await request('GET', '/api/me');
 }
 
 // ═══════════════════════════════════

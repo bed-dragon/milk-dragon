@@ -39,6 +39,10 @@
         <span class="nav-label">番茄钟</span>
       </a>
     </nav>
+    <div class="sidebar-user" id="sidebarUserArea">
+      <span class="sidebar-user-name">未登录</span>
+      <a class="sidebar-user-logout" onclick="Auth.logout()" title="退出登录">🚪 退出登录</a>
+    </div>
   </aside>
 
   <!-- 主区域 -->
@@ -133,10 +137,13 @@
     </main>
   </div>
 
+  <script src="js/auth.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/api.js"></script>
   <script src="js/navigation.js"></script>
   <script>
+    Auth.guard();
+    Auth.renderSidebarUser();
     document.getElementById('currentDate').textContent = today();
 
     // ═══════════════════════════════════

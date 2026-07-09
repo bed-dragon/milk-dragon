@@ -955,3 +955,41 @@ tbody tr:nth-child(even) {
     padding: 8px 10px;
   }
 }
+
+/* ============================================
+   侧边栏用户信息区域
+   ============================================ */
+.sidebar-user {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sidebar-user .sidebar-user-name {
+  color: #ccc;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-user .sidebar-user-logout {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  text-decoration: none;
+}
+.sidebar-user .sidebar-user-logout:hover {
+  color: var(--danger);
+}
+
+@media (max-width: 768px) {
+  .sidebar-user {
+    display: none;
+  }
+}

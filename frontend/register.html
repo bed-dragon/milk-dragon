@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学习养成计划 — 注册</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .auth-page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-body);
+      padding: var(--space-md);
+    }
+    .auth-card {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      padding: 40px;
+      width: 100%;
+      max-width: 420px;
+    }
+    .auth-card .brand {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .auth-card .brand .brand-icon {
+      font-size: 48px;
+      display: block;
+      margin-bottom: 8px;
+    }
+    .auth-card .brand h2 {
+      font-size: 22px;
+      margin: 0;
+      color: var(--text-primary);
+    }
+    .auth-card .brand p {
+      margin: 4px 0 0;
+      color: var(--text-secondary);
+      font-size: var(--font-size-sm);
+    }
+    .auth-form .form-group {
+      margin-bottom: 16px;
+    }
+    .auth-form .form-label {
+      display: block;
+      margin-bottom: 4px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+    .auth-form .form-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-base);
+      transition: var(--transition);
+      box-sizing: border-box;
+    }
+    .auth-form .form-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-light);
+    }
+    .auth-form .btn {
+      width: 100%;
+      padding: 12px;
+      font-size: var(--font-size-base);
+      margin-top: 8px;
+    }
+    .auth-form .form-hint {
+      font-size: var(--font-size-xs);
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .auth-switch {
+      text-align: center;
+      margin-top: 16px;
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+    .auth-switch a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .auth-switch a:hover {
+      text-decoration: underline;
+    }
+    .auth-error {
+      background: #fef2f2;
+      color: var(--danger);
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-sm);
+      margin-bottom: 12px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-page">
+    <div class="auth-card">
+      <div class="brand">
+        <span class="brand-icon">📚</span>
+        <h2>学习养成计划</h2>
+        <p>创建账号开始学习之旅</p>
+      </div>
+
+      <div class="auth-error" id="authError"></div>
+
+      <form class="auth-form" id="registerForm">
+        <div class="form-group">
+          <label class="form-label" for="username">用户名</label>
+          <input class="form-input" type="text" id="username" placeholder="至少 3 个字符" autocomplete="username" required>
+          <div class="form-hint">至少 3 个字符</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="nickname">昵称（选填）</label>
+          <input class="form-input" type="text" id="nickname" placeholder="给自己起个好听的名字" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="password">密码</label>
+          <input class="form-input" type="password" id="password" placeholder="至少 6 位密码" autocomplete="new-password" required>
+          <div class="form-hint">至少 6 位</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="confirmPassword">确认密码</label>
+          <input class="form-input" type="password" id="confirmPassword" placeholder="再次输入密码" autocomplete="new-password" required>
+        </div>
+        <button class="btn btn-primary" type="submit" id="registerBtn">注 册</button>
+      </form>
+
+      <div class="auth-switch">
+        已有账号？<a href="login.html">去登录</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/auth.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
+  <script>
+    // 若已登录，直接跳转首页
+    if (Auth.getToken()) {
+      window.location.href = 'index.html';
+    }
+
+    const errorEl = document.getElementById('authError');
+    const registerBtn = document.getElementById('registerBtn');
+
+    function showError(msg) {
+      errorEl.textContent = msg;
+      errorEl.style.display = 'block';
+    }
+    function hideError() {
+      errorEl.style.display = 'none';
+    }
+
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideError();
+
+      const username = document.getElementById('username').value.trim();
+      const nickname = document.getElementById('nickname').value.trim();
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+
+      // 前端校验
+      if (username.length < 3) {
+        showError('用户名至少 3 个字符');
+        return;
+      }
+      if (password.length < 6) {
+        showError('密码至少 6 位');
+        return;
+      }
+      if (password !== confirmPassword) {
+        showError('两次密码输入不一致');
+        return;
+      }
+
+      registerBtn.disabled = true;
+      registerBtn.textContent = '注册中...';
+
+      try {
+        const data = await register(username, password, nickname);
+        if (data.ok) {
+          // 注册成功自动登录（后端已返回 token）
+          Auth.set(data.data.token, {
+            id: data.data.user_id,
+            username: data.data.username
+          });
+          window.location.href = 'index.html';
+        } else {
+          showError(data.msg || '注册失败，用户名可能已存在');
+        }
+      } catch (err) {
+        showError(err.message || '网络错误，请确认后端已启动');
+      } finally {
+        registerBtn.disabled = false;
+        registerBtn.textContent = '注 册';
+      }
+    });
+  </script>
+</body>
+</html>

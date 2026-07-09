@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学习养成计划 — 登录</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .auth-page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-body);
+      padding: var(--space-md);
+    }
+    .auth-card {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      padding: 40px;
+      width: 100%;
+      max-width: 420px;
+    }
+    .auth-card .brand {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .auth-card .brand .brand-icon {
+      font-size: 48px;
+      display: block;
+      margin-bottom: 8px;
+    }
+    .auth-card .brand h2 {
+      font-size: 22px;
+      margin: 0;
+      color: var(--text-primary);
+    }
+    .auth-card .brand p {
+      margin: 4px 0 0;
+      color: var(--text-secondary);
+      font-size: var(--font-size-sm);
+    }
+    .auth-form .form-group {
+      margin-bottom: 16px;
+    }
+    .auth-form .form-label {
+      display: block;
+      margin-bottom: 4px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+    .auth-form .form-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-base);
+      transition: var(--transition);
+      box-sizing: border-box;
+    }
+    .auth-form .form-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-light);
+    }
+    .auth-form .btn {
+      width: 100%;
+      padding: 12px;
+      font-size: var(--font-size-base);
+      margin-top: 8px;
+      text-align: center;
+      letter-spacing: 4px;
+    }
+    .auth-switch {
+      text-align: center;
+      margin-top: 16px;
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+    .auth-switch a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .auth-switch a:hover {
+      text-decoration: underline;
+    }
+    .auth-error {
+      background: #fef2f2;
+      color: var(--danger);
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-sm);
+      margin-bottom: 12px;
+      display: none;
+    }
+    .auth-test-hint {
+      margin-top: 20px;
+      padding: 12px;
+      background: var(--bg-body);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-xs);
+      color: var(--text-muted);
+      line-height: 1.8;
+    }
+    .auth-test-hint strong {
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-page">
+    <div class="auth-card">
+      <div class="brand">
+        <span class="brand-icon">📚</span>
+        <h2>学习养成计划</h2>
+        <p>登录以继续使用</p>
+      </div>
+
+      <div class="auth-error" id="authError"></div>
+
+      <form class="auth-form" id="loginForm">
+        <div class="form-group">
+          <label class="form-label" for="username">用户名</label>
+          <input class="form-input" type="text" id="username" placeholder="请输入用户名" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="password">密码</label>
+          <input class="form-input" type="password" id="password" placeholder="请输入密码" autocomplete="current-password" required>
+        </div>
+        <button class="btn btn-primary" type="submit" id="loginBtn">登 录</button>
+      </form>
+
+      <div class="auth-switch">
+        还没有账号？<a href="register.html">去注册</a>
+      </div>
+
+      <div class="auth-test-hint">
+        <strong>🔑 测试用户：</strong><br>
+        test / 123456（测试用户）<br>
+        demo / 123456（演示账号）<br>
+        admin / admin123（管理员）
+      </div>
+    </div>
+  </div>
+
+  <script src="js/auth.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
+  <script>
+    // 若已登录，直接跳转首页
+    if (Auth.getToken()) {
+      window.location.href = 'index.html';
+    }
+
+    const errorEl = document.getElementById('authError');
+    const loginBtn = document.getElementById('loginBtn');
+
+    function showError(msg) {
+      errorEl.textContent = msg;
+      errorEl.style.display = 'block';
+    }
+    function hideError() {
+      errorEl.style.display = 'none';
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideError();
+
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+
+      if (!username || !password) {
+        showError('请输入用户名和密码');
+        return;
+      }
+
+      loginBtn.disabled = true;
+      loginBtn.textContent = '登录中...';
+
+      try {
+        const data = await login(username, password);
+        if (data.ok) {
+          Auth.set(data.token, { id: data.user_id, username: username });
+          // 尝试获取完整用户信息
+          try {
+            const me = await getMe();
+            if (me.ok && me.data) {
+              Auth.set(data.token, me.data);
+            }
+          } catch (e) { /* 获取用户信息失败不影响登录 */ }
+          window.location.href = 'index.html';
+        } else {
+          showError(data.msg || '用户名或密码错误');
+        }
+      } catch (err) {
+        showError(err.message || '网络错误，请确认后端已启动');
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = '登 录';
+      }
+    });
+  </script>
+</body>
+</html>
