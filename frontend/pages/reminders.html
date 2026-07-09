@@ -98,11 +98,6 @@
     document.getElementById('currentDate').textContent = today();
 
     async function loadReminders() {
-      // 先展示 MOCK 数据，秒开
-      renderReminders('due', MOCK.reminders.due);
-      renderReminders('review', MOCK.reminders.review);
-
-      // 同时请求后端
       try {
         const [dueData, reviewData] = await Promise.all([
           getReminders('due'),
@@ -110,7 +105,10 @@
         ]);
         renderReminders('due', dueData.reminders || []);
         renderReminders('review', reviewData.reminders || []);
-      } catch (e) { /* MOCK 已在展示 */ }
+      } catch (e) {
+        renderReminders('due', MOCK.reminders.due);
+        renderReminders('review', MOCK.reminders.review);
+      }
     }
 
     function renderReminders(type, reminders) {

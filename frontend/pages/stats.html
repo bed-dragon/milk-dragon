@@ -154,7 +154,6 @@
       const start = document.getElementById('startDate').value;
       const end = document.getElementById('endDate').value;
 
-      // 直接请求后端真实数据
       try {
         const [overview, dailyData] = await Promise.all([
           getOverview(),
@@ -163,8 +162,6 @@
         renderOverview(overview);
         renderCharts(dailyData.daily || []);
       } catch (e) {
-        // 后端挂了才用 MOCK
-        console.warn('后端请求失败，使用模拟数据');
         renderOverview(MOCK.overview);
         renderCharts(MOCK.dailyStats);
       }
