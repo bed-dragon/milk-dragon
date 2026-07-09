@@ -36,7 +36,10 @@ int main() {
         return Server::HandlerResponse::Unhandled;
     });
 
-    // 4. 注册路由
+    // 4. 提供前端静态文件（html/css/js），一个端口搞定全部
+    svr.set_mount_point("/", "../frontend");
+
+    // 5. 注册 API 路由
     svr.Get("/api/hello", [](const Request& req, Response& res) {
         res.set_content(R"({"ok":true,"msg":"hello, 后端已启动!"})", "application/json");
     });

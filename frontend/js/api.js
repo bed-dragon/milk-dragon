@@ -11,7 +11,7 @@
  * 每个 wrapper 函数负责解包 data 字段，返回页面期望的格式
  */
 
-const API_BASE = 'http://localhost:8080';
+const API_BASE = '';  // 空 = 自动跟随当前地址，本地/ngrok都能用
 const REQUEST_TIMEOUT = 8000; // 8 秒超时，给后端充足时间
 
 /**
