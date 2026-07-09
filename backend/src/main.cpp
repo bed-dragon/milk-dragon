@@ -55,7 +55,7 @@ int main() {
         }
         // 兼容旧方式：query param ?user_id=
         if (req.has_param("user_id")) return stoi(req.get_param_value("user_id"));
-        return -1;  // 未认证
+        return 1;  // 默认用户 ID（正式上线后改为 -1 强制登录）
     };
 
     // 辅助宏：检查登录状态，未登录返回 401
@@ -241,17 +241,79 @@ int main() {
     svr.Get("/api/users/search",    handle_search_users);
 
     // ---------------- 好友与社交 ----------------
-    svr.Post("/api/friends/request", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true}", "application/json");
+    // POST /api/friends/request → 发送好友申请
+    svr.Post("/api/friends/request", [&](const Request& req, Response& res) {
+        try {
+            json body = json::parse(req.body);
+            REQUIRE_AUTH(user_id);
+            int to_id = body.value("to_id", 0);
+
+            if (to_id <= 0) {
+                res.status = 400;
+                res.set_content(R"({"ok":false,"error":"缺少 to_id"})", "application/json");
+                return;
+            }
+
+            if (friend_request(user_id, to_id)) {
+                res.set_content(R"({"ok":true,"message":"好友申请已发送"})", "application/json");
+            } else {
+                res.status = 409;
+                res.set_content(R"({"ok":false,"error":"好友关系已存在或申请失败"})", "application/json");
+            }
+        } catch (const exception& e) {
+            res.status = 400;
+            json resp = {{"ok", false}, {"error", string("请求解析失败: ") + e.what()}};
+            res.set_content(resp.dump(), "application/json");
+        }
     });
-    svr.Get("/api/friends", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true,\"data\":[]}", "application/json");
+
+    // GET /api/friends → 好友列表
+    svr.Get("/api/friends", [&](const Request& req, Response& res) {
+        REQUIRE_AUTH(user_id);
+        string data_str = friend_list(user_id);
+        json resp = {{"ok", true}, {"data", json::parse(data_str)}};
+        res.set_content(resp.dump(), "application/json");
     });
-    svr.Post(R"(/api/friends/:id/handle)", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true}", "application/json");
+
+    // POST /api/friends/:id/handle → 通过/拒绝好友申请
+    svr.Post(R"(/api/friends/(\d+)/handle)", [&](const Request& req, Response& res) {
+        try {
+            REQUIRE_AUTH(user_id);
+            int friendship_id = stoi(req.matches[1]);
+            json body = json::parse(req.body);
+            int action = body.value("status", 0);  // 1=接受, 2=拒绝
+
+            if (action != 1 && action != 2) {
+                res.status = 400;
+                json err = {{"ok", false}, {"error", "status must be 1(accept) or 2(reject)"}};
+                res.set_content(err.dump(), "application/json");
+                return;
+            }
+
+            if (friend_handle(friendship_id, action)) {
+                res.set_content(R"({"ok":true,"message":"已处理"})", "application/json");
+            } else {
+                res.status = 404;
+                res.set_content(R"({"ok":false,"error":"申请不存在或已处理"})", "application/json");
+            }
+        } catch (const exception& e) {
+            res.status = 400;
+            json resp = {{"ok", false}, {"error", string("请求解析失败: ") + e.what()}};
+            res.set_content(resp.dump(), "application/json");
+        }
     });
-    svr.Delete(R"(/api/friends/:id)", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true}", "application/json");
+
+    // DELETE /api/friends/:id → 删除好友
+    svr.Delete(R"(/api/friends/(\d+))", [&](const Request& req, Response& res) {
+        REQUIRE_AUTH(user_id);
+        int friendship_id = stoi(req.matches[1]);
+
+        if (friend_delete(friendship_id, user_id)) {
+            res.set_content(R"({"ok":true,"message":"已删除"})", "application/json");
+        } else {
+            res.status = 404;
+            res.set_content(R"({"ok":false,"error":"好友关系不存在"})", "application/json");
+        }
     });
 
     // ---------------- 聊天（Messages） ----------------

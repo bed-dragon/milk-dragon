@@ -1007,10 +1007,146 @@ bool reminder_mark_read(int reminder_id, int user_id) {
 // ============================================================
 
 // 好友
-bool   friend_request(int, int)                          { return false; }
-string friend_list(int)                                   { return "[]"; }
-bool   friend_handle(int, int)                            { return false; }
-bool   friend_delete(int, int)                            { return false; }
+bool friend_request(int from_id, int to_id) {
+    if (from_id == to_id) return false;
+
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    // 检查是否已经存在好友关系
+    sqlite3_stmt* ck = nullptr;
+    const char* check_sql =
+        "SELECT id, status FROM friendships "
+        "WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?);";
+    bool exists = false;
+    if (sqlite3_prepare_v2(db, check_sql, -1, &ck, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(ck, 1, from_id);
+        sqlite3_bind_int(ck, 2, to_id);
+        sqlite3_bind_int(ck, 3, to_id);
+        sqlite3_bind_int(ck, 4, from_id);
+        if (sqlite3_step(ck) == SQLITE_ROW)
+            exists = true;  // 已存在，不管什么状态都不重复申请
+        sqlite3_finalize(ck);
+    }
+    if (exists) { sqlite3_close(db); return false; }
+
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql =
+        "INSERT INTO friendships (from_id, to_id, status) VALUES (?, ?, 0);";
+    bool ok = false;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, from_id);
+        sqlite3_bind_int(stmt, 2, to_id);
+        ok = (sqlite3_step(stmt) == SQLITE_DONE);
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return ok;
+}
+
+string friend_list(int user_id) {
+    sqlite3* db = open_db();
+    if (!db) return "[]";
+
+    json arr = json::array();
+    sqlite3_stmt* stmt = nullptr;
+
+    // 查所有跟 user_id 相关的好友关系，JOIN users 拿对方信息
+    const char* sql = R"(
+        SELECT f.id, f.from_id, f.to_id, f.status, f.created_at,
+               u.id AS other_id, u.username, u.nickname, u.signature
+        FROM friendships f
+        JOIN users u ON (
+            (f.from_id = ? AND u.id = f.to_id) OR
+            (f.to_id = ? AND u.id = f.from_id)
+        )
+        WHERE f.from_id = ? OR f.to_id = ?
+        ORDER BY f.created_at DESC
+    )";
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, user_id);
+        sqlite3_bind_int(stmt, 2, user_id);
+        sqlite3_bind_int(stmt, 3, user_id);
+        sqlite3_bind_int(stmt, 4, user_id);
+
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            int from_id     = sqlite3_column_int(stmt, 1);
+            int status_int  = sqlite3_column_int(stmt, 3);
+            int other_id    = sqlite3_column_int(stmt, 5);
+
+            json f;
+            f["id"]          = sqlite3_column_int(stmt, 0);
+            f["from_id"]     = from_id;
+            f["to_id"]       = sqlite3_column_int(stmt, 2);
+            f["status"]      = status_int;
+            f["created_at"]  = (const char*)sqlite3_column_text(stmt, 4);
+
+            // 对方信息
+            f["other_id"]    = other_id;
+            f["other_name"]  = (const char*)sqlite3_column_text(stmt, 6);
+            f["other_nick"]  = (const char*)sqlite3_column_text(stmt, 7);
+            f["other_sign"]  = (const char*)sqlite3_column_text(stmt, 8);
+
+            // 方便前端判断：我是哪一方
+            f["i_am_sender"] = (from_id == user_id);
+
+            // 状态文本
+            if (status_int == 0)
+                f["status_text"] = (from_id == user_id) ? "等待对方通过" : "待处理";
+            else if (status_int == 1)
+                f["status_text"] = "已添加";
+            else
+                f["status_text"] = "已拒绝";
+
+            arr.push_back(f);
+        }
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return arr.dump();
+}
+
+bool friend_handle(int friendship_id, int status) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    // 只能把"待通过"改成"已通过"或"已拒绝"
+    const char* sql =
+        "UPDATE friendships SET status=? WHERE id=? AND status=0;";
+
+    sqlite3_stmt* stmt = nullptr;
+    bool ok = false;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, status);
+        sqlite3_bind_int(stmt, 2, friendship_id);
+        ok = (sqlite3_step(stmt) == SQLITE_DONE && sqlite3_changes(db) > 0);
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return ok;
+}
+
+bool friend_delete(int friendship_id, int user_id) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    // 只能删除跟自己有关的好友关系
+    const char* sql =
+        "DELETE FROM friendships WHERE id=? AND (from_id=? OR to_id=?);";
+
+    sqlite3_stmt* stmt = nullptr;
+    bool ok = false;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, friendship_id);
+        sqlite3_bind_int(stmt, 2, user_id);
+        sqlite3_bind_int(stmt, 3, user_id);
+        ok = (sqlite3_step(stmt) == SQLITE_DONE && sqlite3_changes(db) > 0);
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return ok;
+}
 // 聊天
 bool   message_send(int, int, const string&)              { return false; }
 string message_history(int, int)                          { return "[]"; }
