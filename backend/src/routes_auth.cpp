@@ -1,6 +1,8 @@
 #include "routes_auth.h"
 #include "db.h"
 #include "json.hpp"
+#include "../libs/sha256.h"
+#include <ctime>
 using namespace std;
 using json = nlohmann::json;
 
@@ -19,8 +21,24 @@ void handle_register(const Request& req, Response& res) { try {
 
     json resp;
     if (uid > 0) {
+        // 注册成功后自动生成 token（即自动登录）
+        string token = sha256(username + to_string(time(nullptr)));
+        // 更新 token 到数据库
+        sqlite3* db = open_db();
+        if (db) {
+            const char* upd = "UPDATE users SET token=? WHERE id=?";
+            sqlite3_stmt* stmt = nullptr;
+            sqlite3_prepare_v2(db, upd, -1, &stmt, 0);
+            sqlite3_bind_text(stmt, 1, token.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_int(stmt, 2, uid);
+            sqlite3_step(stmt);
+            sqlite3_finalize(stmt);
+            sqlite3_close(db);
+        }
         resp["ok"] = true;
         resp["data"]["user_id"] = uid;
+        resp["data"]["token"] = token;
+        resp["data"]["username"] = username;
     } else {
         resp["ok"] = false;
         resp["msg"] = "用户名已存在";

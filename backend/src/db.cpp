@@ -215,6 +215,31 @@ void init_tables() {
 
     sqlite3_close(db);
     cout << "[OK] Database initialized, all tables ready" << endl;
+
+    // 播种测试用户
+    sqlite3* db2 = open_db();
+    if (db2) {
+        const char* sql = "INSERT OR IGNORE INTO users (username, password_hash, nickname) VALUES (?, ?, ?)";
+        sqlite3_stmt* stmt = nullptr;
+        sqlite3_prepare_v2(db2, sql, -1, &stmt, 0);
+
+        auto seed_user = [&](const char* user, const char* pass, const char* nick) {
+            string hash = sha256(pass);
+            sqlite3_reset(stmt);
+            sqlite3_bind_text(stmt, 1, user, -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(stmt, 2, hash.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(stmt, 3, nick, -1, SQLITE_TRANSIENT);
+            sqlite3_step(stmt);
+        };
+
+        seed_user("test",  "123456",   "测试用户");
+        seed_user("demo",  "123456",   "演示账号");
+        seed_user("admin", "admin123", "管理员");
+
+        sqlite3_finalize(stmt);
+        sqlite3_close(db2);
+        cout << "[OK] Test users seeded" << endl;
+    }
 }
 
 // ============================================================
