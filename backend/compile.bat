@@ -1,10 +1,12 @@
 @echo off
 cd /d %~dp0
-taskkill /F /IM server.exe >nul 2>&1
 
 echo ========================================
 echo  Build backend
 echo ========================================
+
+:: 先杀掉旧进程，防止文件占用导致 Permission denied
+taskkill /F /IM server.exe >nul 2>&1
 
 :: 第1步：单独编译 sqlite3.c（C代码，用gcc）
 echo [1/2] Compiling sqlite3...
@@ -19,7 +21,6 @@ if %errorlevel% neq 0 (
 echo [2/2] Compiling C++ and linking...
 g++ -std=c++17 ^
     -Isrc -Ilibs ^
-    -fexec-charset=GBK ^
     src/main.cpp ^
     src/db.cpp ^
     src/routes_tasks.cpp ^

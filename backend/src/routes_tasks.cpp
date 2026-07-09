@@ -38,7 +38,12 @@ void handle_create_task(const Request& req, Response& res) { try {
     t.topic       = body.value("topic", "");
     t.deadline    = body.value("deadline", "");
     t.priority    = body.value("priority", 1);
-    t.need_review = body.value("need_review", 0) != 0;   // 前端发0/1，不是true/false
+    // 兼容前端发 0/1（整数）和 true/false（布尔）
+    if (body.contains("need_review")) {
+        auto& nr = body["need_review"];
+        if (nr.is_boolean())    t.need_review = nr.get<bool>();
+        else if (nr.is_number()) t.need_review = (nr.get<int>() != 0);
+    }
     int user_id = body.value("user_id", 1);
     int new_id = task_create(user_id, t);
     json resp;
@@ -57,7 +62,11 @@ void handle_update_task(const Request& req, Response& res) { try {
     t.deadline    = body.value("deadline", "");
     t.priority    = body.value("priority", 1);
     t.status      = body.value("status", 0);
-    t.need_review = body.value("need_review", 0) != 0;
+    if (body.contains("need_review")) {
+        auto& nr = body["need_review"];
+        if (nr.is_boolean())    t.need_review = nr.get<bool>();
+        else if (nr.is_number()) t.need_review = (nr.get<int>() != 0);
+    }
     int user_id = body.value("user_id", 1);
     bool ok = task_update(task_id, user_id, t);
     json resp;
