@@ -57,6 +57,20 @@
       <!-- 计时器 -->
       <div class="card">
         <div class="pomodoro-timer">
+          <!-- 时长选择 -->
+          <div style="display:flex;justify-content:center;gap:8px;margin-bottom:20px;flex-wrap:wrap;" id="durationPresets">
+            <button class="btn btn-sm btn-primary" onclick="setDuration(15)" data-preset="15">15 分钟</button>
+            <button class="btn btn-sm btn-outline" onclick="setDuration(25)" data-preset="25">25 分钟</button>
+            <button class="btn btn-sm btn-outline" onclick="setDuration(45)" data-preset="45">45 分钟</button>
+            <button class="btn btn-sm btn-outline" onclick="setDuration(60)" data-preset="60">60 分钟</button>
+            <span style="display:flex;align-items:center;gap:4px;">
+              <input class="form-input" type="number" id="customDuration" value="25"
+                     min="1" max="120" style="width:60px;text-align:center;padding:4px;"
+                     onchange="setDuration(parseInt(this.value)||25)">
+              <span style="font-size:13px;color:var(--text-muted);">分钟</span>
+            </span>
+          </div>
+
           <div class="pomodoro-clock" id="pomodoroClock">
             <span style="font-size:36px;">🍅</span>
             <span class="pomodoro-time" id="pomodoroTime">25:00</span>
@@ -119,12 +133,12 @@
     Auth.guard();
     Auth.renderSidebarUser();
     // 计时器状态
-    const DEFAULT_MINUTES = 25;
-    let totalSeconds = DEFAULT_MINUTES * 60;
+    let currentMinutes = 25;  // 当前选择的番茄时长
+    let totalSeconds = currentMinutes * 60;
     let remainingSeconds = totalSeconds;
     let timerId = null;
     let isRunning = false;
-    let isCompleted = false; // 防止 onTimerComplete 重复触发
+    let isCompleted = false;
 
     // DOM 引用
     const timeEl = document.getElementById('pomodoroTime');
@@ -136,6 +150,24 @@
 
     document.getElementById('currentDate').textContent = today();
     loadTodayRecords();
+
+    // ── 自定义时长 ──
+
+    function setDuration(minutes) {
+      if (isRunning) return;  // 运行中不能改
+      currentMinutes = minutes;
+      totalSeconds = minutes * 60;
+      remainingSeconds = totalSeconds;
+      document.getElementById('customDuration').value = minutes;
+
+      // 高亮选中的预设按钮
+      document.querySelectorAll('[data-preset]').forEach(btn => {
+        const isActive = parseInt(btn.dataset.preset) === minutes;
+        btn.className = 'btn btn-sm ' + (isActive ? 'btn-primary' : 'btn-outline');
+      });
+
+      updateDisplay();
+    }
 
     // ── 计时器逻辑 ──
 
@@ -200,6 +232,7 @@
       }
       isRunning = false;
       isCompleted = false;
+      totalSeconds = currentMinutes * 60;
       remainingSeconds = totalSeconds;
       statusEl.textContent = '准备开始';
       btnStart.style.display = 'inline-flex';
@@ -216,10 +249,10 @@
       btnStart.textContent = '▶ 开始';
       clockEl.style.borderColor = 'var(--success)';
 
-      // 记录到后端
+      // 记录到后端（使用实际的时长）
       try {
-        await recordPomodoro(DEFAULT_MINUTES);
-        showToast('番茄钟完成！🎉', 'success');
+        await recordPomodoro(currentMinutes);
+        showToast(currentMinutes + ' 分钟番茄钟完成！🎉', 'success');
       } catch (e) {
         // Mock 模式
         if (!MOCK.pomodoroToday) MOCK.pomodoroToday = [];
@@ -227,7 +260,7 @@
         const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
         MOCK.pomodoroToday.push({
           id: Date.now(),
-          duration: DEFAULT_MINUTES,
+          duration: currentMinutes,
           start_time: timeStr,
           date: today()
         });
