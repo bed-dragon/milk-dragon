@@ -18,7 +18,7 @@ static int get_uid_from_req(const Request& req) {
     // 兼容 query param
     auto uid = req.get_param_value("user_id");
     if (!uid.empty()) return stoi(uid);
-    return -1;
+    return -1;  // 未认证
 }
 
 #define CATCH_ERR catch(exception& e) { \
