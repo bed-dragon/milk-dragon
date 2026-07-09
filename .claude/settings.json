@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(taskkill /F /IM server.exe)",
+      "Bash(rm -f \"d:/Desktop/milk-dragon/backend/server.exe\")"
+    ]
+  }
+}
