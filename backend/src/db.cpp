@@ -3,6 +3,7 @@
 #include <set>
 #include <map>
 #include <ctime>
+#include <direct.h>
 #include "sqlite3.h"
 #include "json.hpp"
 #include "sha256.h"
@@ -18,6 +19,8 @@ using namespace std;
 // ---------- 1. open_db ----------
 
 sqlite3* open_db() {
+    // 确保 data 目录存在（合并后可能丢失）
+    _mkdir("data");
     sqlite3* db = nullptr;
     int rc = sqlite3_open("data/study.db", &db);
     if (rc != SQLITE_OK) {
