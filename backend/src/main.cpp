@@ -307,12 +307,14 @@ int main() {
         res.set_content(resp.dump(), "application/json");
     });
 
-    // 5. 关掉 httplib 自带的日志
+    // 5. 设置前端静态文件目录
+    svr.set_mount_point("/", "../frontend");
+
+    // 6. 关掉 httplib 自带的日志
     svr.set_logger(nullptr);
 
-    // 6. 启动服务器
-    cout << "Server: http://localhost:8080" << endl;
-    cout << "Test:   http://localhost:8080/api/hello" << endl;
+    // 7. 启动服务器
+    cout << "Open in browser: http://localhost:8080" << endl;
     svr.listen("0.0.0.0", 8080);
 
     return 0;

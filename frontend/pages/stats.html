@@ -154,11 +154,6 @@
       const start = document.getElementById('startDate').value;
       const end = document.getElementById('endDate').value;
 
-      // 先展示 MOCK 数据，秒开
-      renderOverview(MOCK.overview);
-      renderCharts(MOCK.dailyStats);
-
-      // 同时请求后端，成功后无缝更新
       try {
         const [overview, dailyData] = await Promise.all([
           getOverview(),
@@ -166,7 +161,10 @@
         ]);
         renderOverview(overview);
         renderCharts(dailyData.daily || []);
-      } catch (e) { /* MOCK 已在展示 */ }
+      } catch (e) {
+        renderOverview(MOCK.overview);
+        renderCharts(MOCK.dailyStats);
+      }
     }
 
     function renderOverview(data) {

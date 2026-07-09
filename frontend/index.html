@@ -143,14 +143,7 @@
     // 仪表盘数据加载（先展示 MOCK，再尝试请求后端）
     // ═══════════════════════════════════
     async function loadDashboard() {
-      // 先展示 MOCK 数据，秒开
-      const allReminders = [...(MOCK.reminders.due || []), ...(MOCK.reminders.review || [])];
-      renderOverview(MOCK.overview);
-      renderReminders(allReminders);
-      renderRecentTasks(MOCK.tasks);
-      checkReminderNotification(allReminders);
-
-      // 同时尝试请求后端，成功后无缝更新
+      // 先请求后端，失败才用 MOCK
       try {
         const [overview, reminders, tasks] = await Promise.all([
           getOverview(),
@@ -158,11 +151,16 @@
           getTasks()
         ]);
         renderOverview(overview);
-        renderReminders(reminders.reminders || []);
+        const allReminders = reminders.reminders || [];
+        renderReminders(allReminders);
         renderRecentTasks(tasks.tasks || []);
-        checkReminderNotification(reminders.reminders || []);
+        checkReminderNotification(allReminders);
       } catch (e) {
-        // MOCK 数据已经在展示，无需处理
+        const allReminders = [...(MOCK.reminders.due || []), ...(MOCK.reminders.review || [])];
+        renderOverview(MOCK.overview);
+        renderReminders(allReminders);
+        renderRecentTasks(MOCK.tasks);
+        checkReminderNotification(allReminders);
       }
     }
 
