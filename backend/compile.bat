@@ -25,6 +25,7 @@ g++ -std=c++17 ^
     src/db.cpp ^
     src/routes_tasks.cpp ^
     src/routes_auth.cpp ^
+    src/routes_material.cpp ^
     sqlite3.o ^
     -lws2_32 ^
     -o server.exe

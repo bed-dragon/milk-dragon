@@ -4,6 +4,7 @@
 #include "json.hpp"
 #include "routes_tasks.h"
 #include "routes_auth.h"
+#include "routes_material.h"
 
 using namespace httplib;
 using json = nlohmann::json;
@@ -180,16 +181,10 @@ int main() {
         res.set_content(resp.dump(), "application/json");
     });
 
-    // ---------------- 收藏学习资料（materials） ----------------
-    svr.Get("/api/materials", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true,\"data\":[]}", "application/json");
-    });
-    svr.Post("/api/materials", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true,\"message\":\"material added (stub)\",\"data\":{\"id\":1}}", "application/json");
-    });
-    svr.Delete(R"(/api/materials/:id)", [](const Request& req, Response& res) {
-        res.set_content("{\"ok\":true}", "application/json");
-    });
+    // ---------------- 收藏学习资料 ----------------
+    svr.Get("/api/materials",              handle_get_materials);
+    svr.Post("/api/materials",             handle_add_material);
+    svr.Delete(R"(/api/materials/(\d+))",  handle_delete_material);
 
     // ---------------- 番茄钟（Pomodoro） ----------------
     svr.Post("/api/pomodoro", [](const Request& req, Response& res) {
