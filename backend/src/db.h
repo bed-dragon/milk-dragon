@@ -106,11 +106,13 @@ sqlite3* open_db();
 void init_tables();
 
 // 用户
-int    user_create(const string& username, const string& password);
+int    user_create(const string& username, const string& password, const string& nickname = "");
 string user_login(const string& username, const string& password);
 int    user_id_by_token(const string& token);
 string user_get_info(int user_id);
 string user_search(const string& keyword);
+bool   user_update_profile(int user_id, const string& nickname, const string& signature);
+bool   user_change_password(int user_id, const string& old_pwd, const string& new_pwd);
 
 // 任务
 int    task_create(int user_id, const Task& t);

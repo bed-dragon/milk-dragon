@@ -250,17 +250,18 @@ void init_tables() {
 // ============================================================
 
 // 注册：密码 SHA256 哈希后存入，返回新用户 id，重名返回 -1
-int user_create(const string& username, const string& password) {
+int user_create(const string& username, const string& password, const string& nickname) {
     sqlite3* db = open_db();
     if (!db) return -1;
 
     string hash = sha256(password);
 
-    const char* sql = "INSERT INTO users (username, password_hash) VALUES (?, ?)";
+    const char* sql = "INSERT INTO users (username, password_hash, nickname) VALUES (?, ?, ?)";
     sqlite3_stmt* stmt = nullptr;
     sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
     sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 2, hash.c_str(),     -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, nickname.c_str(), -1, SQLITE_TRANSIENT);
 
     int ok = sqlite3_step(stmt);
     int new_id = (ok == SQLITE_DONE) ? (int)sqlite3_last_insert_rowid(db) : -1;
@@ -427,6 +428,53 @@ string user_search(const string& keyword) {
     sqlite3_finalize(stmt);
     sqlite3_close(db);
     return result;
+}
+
+// 更新个人资料（昵称 + 签名）
+bool user_update_profile(int user_id, const string& nickname, const string& signature) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+    const char* sql = "UPDATE users SET nickname=?, signature=? WHERE id=?";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    sqlite3_bind_text(stmt, 1, nickname.c_str(),  -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, signature.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt,  3, user_id);
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return ok;
+}
+
+// 修改密码：先验证旧密码，再更新
+bool user_change_password(int user_id, const string& old_pwd, const string& new_pwd) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    // 验证旧密码
+    string old_hash = sha256(old_pwd);
+    const char* check = "SELECT id FROM users WHERE id=? AND password_hash=?";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, check, -1, &stmt, 0);
+    sqlite3_bind_int(stmt, 1, user_id);
+    sqlite3_bind_text(stmt, 2, old_hash.c_str(), -1, SQLITE_TRANSIENT);
+    if (sqlite3_step(stmt) != SQLITE_ROW) {
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
+        return false;  // 旧密码不对
+    }
+    sqlite3_finalize(stmt);
+
+    // 更新为新密码
+    string new_hash = sha256(new_pwd);
+    const char* upd = "UPDATE users SET password_hash=?, token='' WHERE id=?";
+    sqlite3_prepare_v2(db, upd, -1, &stmt, 0);
+    sqlite3_bind_text(stmt, 1, new_hash.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 2, user_id);
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return ok;
 }
 
 // ============================================================
