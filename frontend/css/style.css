@@ -209,8 +209,20 @@ a:hover {
   color: rgba(200, 160, 255, 0.9);
 }
 .nav-item:nth-child(6) {
-  border-left-color: rgba(255, 71, 87, 0.4);
-  color: rgba(255, 160, 175, 0.9);
+  border-left-color: rgba(26, 188, 156, 0.4);
+  color: rgba(26, 188, 156, 0.9);
+}
+.nav-item:nth-child(7) {
+  border-left-color: rgba(253, 121, 168, 0.4);
+  color: rgba(253, 121, 168, 0.9);
+}
+.nav-item:nth-child(8) {
+  border-left-color: rgba(0, 210, 211, 0.4);
+  color: rgba(0, 210, 211, 0.9);
+}
+.nav-item:nth-child(9) {
+  border-left-color: rgba(255, 165, 2, 0.4);
+  color: rgba(255, 200, 100, 0.9);
 }
 
 /* 图标颜色 */
@@ -219,7 +231,10 @@ a:hover {
 .nav-item:nth-child(3) .nav-icon { color: #00d861; }
 .nav-item:nth-child(4) .nav-icon { color: #2d7dff; }
 .nav-item:nth-child(5) .nav-icon { color: #a855f7; }
-.nav-item:nth-child(6) .nav-icon { color: #ff4757; }
+.nav-item:nth-child(6) .nav-icon { color: #1abc9c; }
+.nav-item:nth-child(7) .nav-icon { color: #fd79a8; }
+.nav-item:nth-child(8) .nav-icon { color: #00d2d3; }
+.nav-item:nth-child(9) .nav-icon { color: #f1c40f; }
 
 /* 悬停/激活：左条变实色 + 文字变白 + 背景光晕 */
 .nav-item:nth-child(1):hover,
@@ -233,7 +248,37 @@ a:hover {
 .nav-item:nth-child(5):hover,
 .nav-item:nth-child(5).active { border-left-color: #a855f7; color: #fff; background: rgba(168, 85, 247, 0.25); }
 .nav-item:nth-child(6):hover,
-.nav-item:nth-child(6).active { border-left-color: #ff4757; color: #fff; background: rgba(255, 71, 87, 0.25); }
+.nav-item:nth-child(6).active { border-left-color: #1abc9c; color: #fff; background: rgba(26, 188, 156, 0.25); }
+.nav-item:nth-child(7):hover,
+.nav-item:nth-child(7).active { border-left-color: #fd79a8; color: #fff; background: rgba(253, 121, 168, 0.25); }
+.nav-item:nth-child(8):hover,
+.nav-item:nth-child(8).active { border-left-color: #00d2d3; color: #fff; background: rgba(0, 210, 211, 0.25); }
+.nav-item:nth-child(9):hover,
+.nav-item:nth-child(9).active { border-left-color: #f1c40f; color: #fff; background: rgba(241, 196, 15, 0.25); }
+
+/* 管理员导航按钮颜色（第12=用户管理, 13=推荐任务库, 14=系统统计） */
+.nav-item:nth-child(12) {
+  border-left-color: rgba(255, 46, 99, 0.4);
+  color: rgba(255, 150, 180, 0.9);
+}
+.nav-item:nth-child(13) {
+  border-left-color: rgba(72, 52, 212, 0.4);
+  color: rgba(160, 140, 255, 0.9);
+}
+.nav-item:nth-child(14) {
+  border-left-color: rgba(0, 184, 148, 0.4);
+  color: rgba(0, 210, 180, 0.9);
+}
+.nav-item:nth-child(12) .nav-icon { color: #ff2e63; }
+.nav-item:nth-child(13) .nav-icon { color: #4834d4; }
+.nav-item:nth-child(14) .nav-icon { color: #00b894; }
+.nav-item:nth-child(12):hover,
+.nav-item:nth-child(12).active { border-left-color: #ff2e63; color: #fff; background: rgba(255, 46, 99, 0.25); }
+.nav-item:nth-child(13):hover,
+.nav-item:nth-child(13).active { border-left-color: #4834d4; color: #fff; background: rgba(72, 52, 212, 0.25); }
+.nav-item:nth-child(14):hover,
+.nav-item:nth-child(14).active { border-left-color: #00b894; color: #fff; background: rgba(0, 184, 148, 0.25); }
+
 .nav-item .nav-icon {
   margin-right: var(--space-md);
   font-size: var(--font-size-lg);
@@ -587,42 +632,59 @@ tbody tr:hover {
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
+  gap: 0;
+  border: 1px solid #999;
+  border-radius: 6px;
+  overflow: hidden;
+  max-width: 280px;
+  margin: 0 auto;
 }
 .calendar-header {
   text-align: center;
-  font-size: var(--font-size-sm);
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-secondary);
   padding: 4px 0;
+  border-bottom: 1px solid #999;
+  background: var(--bg-card);
 }
 .calendar-day {
-  aspect-ratio: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--font-size-sm);
-  border-radius: var(--radius-sm);
+  font-size: 12px;
   cursor: pointer;
   transition: background var(--transition);
   position: relative;
+  background: var(--bg-card);
+  border-right: 1px solid #bbb;
+  border-bottom: 1px solid #bbb;
+  aspect-ratio: 1;
+}
+.calendar-day:empty, .calendar-day.placeholder { border: none; background: transparent; }
+.calendar-day:empty, .calendar-day.placeholder {
+  background: transparent;
+  border: none;
 }
 .calendar-day:hover {
-  background: var(--bg-body);
+  background: #f5f5f5;
+}
+.calendar-day.today:not(.checked) {
+  font-weight: 700;
+  color: var(--primary);
 }
 .calendar-day.checked {
-  position: relative;
-  overflow: hidden;
+  background: transparent;
 }
 .calendar-day.checked::before {
   content: '';
   position: absolute;
   inset: 3px;
   border-radius: 50%;
-  opacity: 0.50;
+  opacity: 0.85;
   pointer-events: none;
   animation: stampIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-  border: 2px solid rgba(255, 71, 87, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.3);
 }
 .calendar-day.stamp-1::before { background: url('../images/stamp-1.jpg') center / cover no-repeat; }
 .calendar-day.stamp-2::before { background: url('../images/stamp-2.jpg') center / cover no-repeat; }
@@ -630,25 +692,25 @@ tbody tr:hover {
 .calendar-day.checked .day-text {
   position: relative;
   z-index: 1;
+  color: var(--text-primary);
   font-weight: 700;
+  font-size: 11px;
 }
+
+.calendar-day:empty { background: transparent; border: none; }
 
 @keyframes stampIn {
   0% {
-    transform: scale(2.5) rotate(-15deg);
+    transform: scale(0);
     opacity: 0;
   }
   50% {
-    transform: scale(0.85) rotate(3deg);
-    opacity: 0.65;
-  }
-  70% {
-    transform: scale(1.05) rotate(-1deg);
-    opacity: 0.55;
+    transform: scale(1.1);
+    opacity: 1;
   }
   100% {
-    transform: scale(1) rotate(0deg);
-    opacity: 0.50;
+    transform: scale(1);
+    opacity: 0.80;
   }
 }
 .calendar-day.today {

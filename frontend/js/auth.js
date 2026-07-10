@@ -108,9 +108,9 @@ const Auth = {
       { page: 'stats',      href: base + 'stats.html',      icon: '📈', label: '数据分析' },
       { page: 'reminders',  href: base + 'reminders.html',  icon: '🔔', label: '提醒中心' },
       { page: 'pomodoro',   href: base + 'pomodoro.html',   icon: '🍅', label: '番茄钟' },
-      { page: 'profile',    href: base + 'profile.html',    icon: '👤', label: '个人中心' },
-      { page: 'friends',    href: base + 'friends.html',    icon: '👥', label: '好友' },
-      { page: 'materials',  href: base + 'materials.html',  icon: '📎', label: '学习资料' },
+      { page: 'profile',    href: base + 'profile.html',    icon: '🧑', label: '个人中心' },
+      { page: 'friends',    href: base + 'friends.html',    icon: '🤝', label: '好友' },
+      { page: 'materials',  href: base + 'materials.html',  icon: '📚', label: '学习资料' },
     ];
 
     // 管理员专属导航项
