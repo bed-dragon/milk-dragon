@@ -1248,6 +1248,9 @@ string friend_list(int user_id) {
             else
                 f["status_text"] = "已拒绝";
 
+            // 查未读消息数（对方发来的）
+            f["unread"] = message_unread_count(user_id, other_id);
+
             arr.push_back(f);
         }
         sqlite3_finalize(stmt);
@@ -1363,16 +1366,21 @@ string message_history(int user_id, int friend_id) {
     return arr.dump();
 }
 
-int message_unread_count(int user_id) {
+int message_unread_count(int user_id, int friend_id) {
     sqlite3* db = open_db();
     if (!db) return 0;
 
     int count = 0;
     sqlite3_stmt* stmt = nullptr;
-    const char* sql = "SELECT COUNT(*) FROM messages WHERE to_id=? AND is_read=0;";
+    const char* sql;
+    if (friend_id > 0)
+        sql = "SELECT COUNT(*) FROM messages WHERE to_id=? AND from_id=? AND is_read=0;";
+    else
+        sql = "SELECT COUNT(*) FROM messages WHERE to_id=? AND is_read=0;";
 
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
         sqlite3_bind_int(stmt, 1, user_id);
+        if (friend_id > 0) sqlite3_bind_int(stmt, 2, friend_id);
         if (sqlite3_step(stmt) == SQLITE_ROW)
             count = sqlite3_column_int(stmt, 0);
         sqlite3_finalize(stmt);

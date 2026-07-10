@@ -168,12 +168,16 @@
         return;
       }
 
-      container.innerHTML = accepted.map(f => `
+      container.innerHTML = accepted.map(f => {
+        const unreadBadge = (f.unread && f.unread > 0)
+          ? `<span style="background:var(--danger);color:#fff;font-size:11px;min-width:18px;height:18px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;margin-left:6px;">${f.unread}</span>`
+          : '';
+        return `
         <div class="friend-item">
           <div class="friend-item-left">
             <div class="friend-avatar">${(f.other_nick || f.other_name || '?')[0].toUpperCase()}</div>
             <div class="friend-info">
-              <div class="friend-name">${f.other_nick || f.other_name}</div>
+              <div class="friend-name">${f.other_nick || f.other_name}${unreadBadge}</div>
               <div class="friend-sign">${f.other_sign || '这个人很懒，什么都没写~'}</div>
             </div>
           </div>
@@ -182,7 +186,7 @@
             <button class="btn btn-sm btn-danger" onclick="removeFriend(${f.id}, this)">删除</button>
           </div>
         </div>
-      `).join('');
+      `}).join('');
     }
 
     function renderRequests() {
