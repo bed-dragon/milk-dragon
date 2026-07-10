@@ -11,7 +11,7 @@
  * 每个 wrapper 函数负责解包 data 字段，返回页面期望的格式
  */
 
-const API_BASE = 'http://localhost:8080';
+const API_BASE = '';  // 空 = 自动跟随当前地址，本地/ngrok都能用
 const REQUEST_TIMEOUT = 8000; // 8 秒超时，给后端充足时间
 
 /**
@@ -22,18 +22,33 @@ async function request(method, path, body = null) {
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
   try {
+    const headers = { 'Content-Type': 'application/json' };
+    // 自动附加 Authorization header
+    if (typeof Auth !== 'undefined' && Auth.getToken()) {
+      headers['Authorization'] = 'Bearer ' + Auth.getToken();
+    }
+
     const options = {
       method: method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       signal: controller.signal,
     };
     if (body) options.body = JSON.stringify(body);
 
     const res = await fetch(API_BASE + path, options);
+
+    // 401 未认证 — 清除登录状态并跳转
+    if (res.status === 401) {
+      if (typeof Auth !== 'undefined') Auth.clear();
+      const prefix = window.location.pathname.includes('/pages/') ? '../' : '';
+      window.location.href = prefix + 'login.html';
+      throw new Error('请先登录');
+    }
+
     const data = await res.json();
 
     if (!data.ok && data.ok !== undefined) {
-      throw new Error(data.error || '请求失败');
+      throw new Error(data.error || data.msg || '请求失败');
     }
     return data;
   } finally {
@@ -90,7 +105,7 @@ async function getCheckins(dateOrTaskId) {
 
 /** 获取连续打卡天数 → { streak: N } */
 async function getStreak() {
-  const data = await request('POST', '/api/signins', { user_id: 1, date: today() });
+  const data = await request('POST', '/api/signins', { date: today() });
   const inner = data.data || {};
   return { streak: inner.streak || 0 };
 }
@@ -141,7 +156,7 @@ async function getReminders(type = '') {
 
 /** 标记提醒已读 */
 function markReminderRead(id) {
-  return request('POST', '/api/reminders/mark_read', { reminder_id: id, user_id: 1 });
+  return request('POST', '/api/reminders/mark_read', { reminder_id: id });
 }
 
 // ═══════════════════════════════════
@@ -150,7 +165,7 @@ function markReminderRead(id) {
 
 /** 记录一次番茄钟 */
 function recordPomodoro(duration) {
-  return request('POST', '/api/pomodoro', { user_id: 1, duration: duration });
+  return request('POST', '/api/pomodoro', { duration: duration });
 }
 
 /** 获取今日番茄钟记录 → { records: [...] } */
@@ -168,6 +183,107 @@ async function getRandomQuote() {
   const data = await request('GET', '/api/quotes/random');
   const d = data.data || {};
   return { content: d.content || '', author: d.author || '佚名' };
+}
+
+// ═══════════════════════════════════
+// 认证 API
+// ═══════════════════════════════════
+
+/** 登录 → { token, user_id, ... } */
+async function login(username, password) {
+  return await request('POST', '/api/auth/login', { username, password });
+}
+
+/** 注册（成功后自动返回 token）→ { token, user_id, username } */
+async function register(username, password, nickname) {
+  return await request('POST', '/api/auth/register', { username, password, nickname });
+}
+
+/** 获取当前用户信息 → { id, username, nickname, signature, created_at } */
+async function getMe() {
+  return await request('GET', '/api/me');
+}
+
+/** 更新个人资料 → { nickname, signature } */
+async function updateProfile(nickname, signature) {
+  return await request('PUT', '/api/me', { nickname, signature });
+}
+
+/** 修改密码 → { old_password, new_password } */
+async function changePassword(oldPwd, newPwd) {
+  return await request('PUT', '/api/me/password', { old_password: oldPwd, new_password: newPwd });
+}
+
+// ═══════════════════════════════════
+// 好友 API
+// ═══════════════════════════════════
+
+/** 搜索用户 → [{ id, username, nickname }] */
+async function searchUsers(q) {
+  const data = await request('GET', `/api/users/search?q=${encodeURIComponent(q)}`);
+  return data.data || [];
+}
+
+/** 获取好友列表 → [{ id, status, other_id, other_name, other_nick, ... }] */
+async function getFriendList() {
+  const data = await request('GET', '/api/friends');
+  return data.data || [];
+}
+
+/** 发送好友申请 */
+function sendFriendRequest(toId) {
+  return request('POST', '/api/friends/request', { to_id: toId });
+}
+
+/** 处理好友申请（1=接受, 2=拒绝） */
+function handleFriendRequest(friendshipId, status) {
+  return request('POST', `/api/friends/${friendshipId}/handle`, { status: status });
+}
+
+/** 删除好友 */
+function deleteFriend(friendshipId) {
+  return request('DELETE', `/api/friends/${friendshipId}`);
+}
+
+// ═══════════════════════════════════
+// 学习资料 API
+// ═══════════════════════════════════
+
+/** 获取收藏列表 → [{ id, title, url, created_at }] */
+async function getMaterials() {
+  const data = await request('GET', '/api/materials');
+  return data.data || [];
+}
+
+/** 添加收藏 */
+function addMaterial(title, url) {
+  return request('POST', '/api/materials', { title, url });
+}
+
+/** 删除收藏 */
+function deleteMaterial(id) {
+  return request('DELETE', `/api/materials/${id}`);
+}
+
+// ═══════════════════════════════════
+// 聊天 API
+// ═══════════════════════════════════
+
+/** 发送消息 */
+function sendMessage(toId, content) {
+  return request('POST', '/api/messages', { to_id: toId, content: content });
+}
+
+/** 获取与某好友的消息历史 → [{ id, from_id, to_id, content, is_read, created_at, mine }] */
+async function getMessages(friendId) {
+  const data = await request('GET', `/api/messages/${friendId}`);
+  return data.data || [];
+}
+
+/** 获取未读消息数 → { count: N } */
+async function getUnreadCount() {
+  const data = await request('GET', '/api/messages/unread_count');
+  return data.count || 0;
 }
 
 // ═══════════════════════════════════

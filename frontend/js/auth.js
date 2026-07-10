@@ -65,8 +65,9 @@ const Auth = {
     if (!container) return;
     const user = this.getUser();
     if (user) {
+      var profileUrl = (window.location.pathname.includes('/pages/') ? '' : 'pages/') + 'profile.html';
       container.innerHTML =
-        '<span class="sidebar-user-name">' + (user.nickname || user.username) + '</span>' +
+        '<a class="sidebar-user-name" href="' + profileUrl + '" title="查看个人中心">' + (user.nickname || user.username) + '</a>' +
         '<a class="sidebar-user-logout" onclick="Auth.logout()">退出登录</a>';
     }
   }

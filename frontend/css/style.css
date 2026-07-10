@@ -955,3 +955,308 @@ tbody tr:nth-child(even) {
     padding: 8px 10px;
   }
 }
+
+/* ============================================
+   侧边栏用户信息区域
+   ============================================ */
+.sidebar-user {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sidebar-user .sidebar-user-name {
+  color: #ccc;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-user .sidebar-user-logout {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  text-decoration: none;
+}
+.sidebar-user .sidebar-user-logout:hover {
+  color: var(--danger);
+}
+
+@media (max-width: 768px) {
+  .sidebar-user {
+    display: none;
+  }
+}
+
+/* ============================================
+   标签页切换
+   ============================================ */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: var(--space-md);
+}
+.tab-item {
+  padding: 8px 20px;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all var(--transition);
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  font-family: var(--font-family);
+}
+.tab-item:hover {
+  color: var(--text-primary);
+}
+.tab-item.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+/* ============================================
+   聊天气泡
+   ============================================ */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--topbar-height) - 120px);
+  min-height: 400px;
+}
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-md);
+  background: var(--bg-body);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.chat-bubble {
+  max-width: 75%;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  word-break: break-word;
+  position: relative;
+}
+.chat-bubble-self {
+  align-self: flex-end;
+  background: var(--primary);
+  color: #fff;
+  border-bottom-right-radius: 2px;
+}
+.chat-bubble-friend {
+  align-self: flex-start;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border-bottom-left-radius: 2px;
+  box-shadow: var(--shadow-sm);
+}
+.chat-bubble-time {
+  font-size: var(--font-size-xs);
+  opacity: 0.7;
+  margin-top: 4px;
+  text-align: right;
+}
+.chat-input-area {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+.chat-input-area .form-input {
+  flex: 1;
+}
+
+/* ============================================
+   好友列表
+   ============================================ */
+.friend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.friend-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px var(--space-md);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition);
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.friend-item:hover {
+  background: var(--bg-body);
+}
+.friend-item.active {
+  background: var(--primary-light);
+  border-left: 3px solid var(--primary);
+}
+.friend-item-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex: 1;
+  min-width: 0;
+}
+.friend-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.friend-info {
+  flex: 1;
+  min-width: 0;
+}
+.friend-info .friend-name {
+  font-weight: 500;
+  font-size: var(--font-size-base);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.friend-info .friend-sign {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+.friend-actions {
+  display: flex;
+  gap: var(--space-xs);
+  flex-shrink: 0;
+}
+
+/* ============================================
+   搜索框
+   ============================================ */
+.search-box {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+.search-box .form-input {
+  flex: 1;
+}
+.search-result-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ============================================
+   个人中心
+   ============================================ */
+.profile-card {
+  max-width: 560px;
+}
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
+  padding-bottom: var(--space-lg);
+  border-bottom: 1px solid var(--border);
+}
+.profile-avatar-large {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.profile-info-text .profile-name {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.profile-info-text .profile-meta {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+.profile-section {
+  margin-bottom: var(--space-lg);
+}
+.profile-section h3 {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  margin-bottom: var(--space-sm);
+  color: var(--text-secondary);
+}
+
+/* ============================================
+   双栏布局（聊天页用）
+   ============================================ */
+.two-col {
+  display: flex;
+  gap: var(--space-md);
+  height: calc(100vh - var(--topbar-height) - var(--space-lg) * 2);
+  min-height: 500px;
+}
+.two-col-side {
+  width: 260px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+.two-col-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+@media (max-width: 768px) {
+  .two-col {
+    flex-direction: column;
+    height: auto;
+  }
+  .two-col-side {
+    width: 100%;
+    max-height: 200px;
+  }
+  .chat-bubble {
+    max-width: 90%;
+  }
+}

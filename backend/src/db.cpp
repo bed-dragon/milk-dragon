@@ -3,6 +3,7 @@
 #include <set>
 #include <map>
 #include <ctime>
+#include <direct.h>
 #include "sqlite3.h"
 #include "json.hpp"
 #include "sha256.h"
@@ -18,6 +19,8 @@ using namespace std;
 // ---------- 1. open_db ----------
 
 sqlite3* open_db() {
+    // 确保 data 目录存在（合并后可能丢失）
+    _mkdir("data");
     sqlite3* db = nullptr;
     int rc = sqlite3_open("data/study.db", &db);
     if (rc != SQLITE_OK) {
@@ -215,6 +218,31 @@ void init_tables() {
 
     sqlite3_close(db);
     cout << "[OK] Database initialized, all tables ready" << endl;
+
+    // 播种测试用户
+    sqlite3* db2 = open_db();
+    if (db2) {
+        const char* sql = "INSERT OR IGNORE INTO users (username, password_hash, nickname) VALUES (?, ?, ?)";
+        sqlite3_stmt* stmt = nullptr;
+        sqlite3_prepare_v2(db2, sql, -1, &stmt, 0);
+
+        auto seed_user = [&](const char* user, const char* pass, const char* nick) {
+            string hash = sha256(pass);
+            sqlite3_reset(stmt);
+            sqlite3_bind_text(stmt, 1, user, -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(stmt, 2, hash.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(stmt, 3, nick, -1, SQLITE_TRANSIENT);
+            sqlite3_step(stmt);
+        };
+
+        seed_user("test",  "123456",   "测试用户");
+        seed_user("demo",  "123456",   "演示账号");
+        seed_user("admin", "admin123", "管理员");
+
+        sqlite3_finalize(stmt);
+        sqlite3_close(db2);
+        cout << "[OK] Test users seeded" << endl;
+    }
 }
 
 // ============================================================
@@ -494,6 +522,19 @@ bool task_update(int task_id, int user_id, const Task& t) {
     sqlite3* db = open_db();
     if (!db) return false;
 
+    // 如果 status=-1，表示前端没传，保留数据库原值
+    int st = t.status;
+    if (st == -1) {
+        const char* q = "SELECT status FROM tasks WHERE id=?";
+        sqlite3_stmt* s = nullptr;
+        if (sqlite3_prepare_v2(db, q, -1, &s, 0) == SQLITE_OK) {
+            sqlite3_bind_int(s, 1, task_id);
+            if (sqlite3_step(s) == SQLITE_ROW) st = sqlite3_column_int(s, 0);
+            else st = 0;
+            sqlite3_finalize(s);
+        }
+    }
+
     const char* sql = R"(
         UPDATE tasks SET title=?, topic=?, deadline=?, priority=?, status=?, need_review=?
         WHERE id=? AND user_id=?
@@ -505,7 +546,7 @@ bool task_update(int task_id, int user_id, const Task& t) {
     sqlite3_bind_text(stmt, 2, t.topic.c_str(),    -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 3, t.deadline.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_int(stmt,  4, t.priority);
-    sqlite3_bind_int(stmt,  5, t.status);
+    sqlite3_bind_int(stmt,  5, st);  // 用保留后的状态
     sqlite3_bind_int(stmt,  6, t.need_review ? 1 : 0);
     sqlite3_bind_int(stmt,  7, task_id);
     sqlite3_bind_int(stmt,  8, user_id);
@@ -613,6 +654,19 @@ bool checkin_do(int user_id, int task_id, const string& date) {
         if (!ok) cerr << "[WARN] checkin_do: 可能重复打卡 " << sqlite3_errmsg(db) << endl;
         sqlite3_finalize(stmt);
     }
+
+    // 打卡成功 → 标记任务为已完成
+    if (ok) {
+        const char* upd = "UPDATE tasks SET status=1 WHERE id=? AND user_id=?";
+        sqlite3_stmt* stmt2 = nullptr;
+        if (sqlite3_prepare_v2(db, upd, -1, &stmt2, nullptr) == SQLITE_OK) {
+            sqlite3_bind_int(stmt2, 1, task_id);
+            sqlite3_bind_int(stmt2, 2, user_id);
+            sqlite3_step(stmt2);
+            sqlite3_finalize(stmt2);
+        }
+    }
+
     sqlite3_close(db);
     return ok;
 }
@@ -753,7 +807,7 @@ string stats_overview(int user_id) {
     }
 
     const char* sql_done =
-        "SELECT COUNT(DISTINCT task_id) FROM checkins WHERE user_id = ?;";
+        "SELECT COUNT(*) FROM tasks WHERE user_id = ? AND status = 1;";
     if (sqlite3_prepare_v2(db, sql_done, -1, &stmt, nullptr) == SQLITE_OK) {
         sqlite3_bind_int(stmt, 1, user_id);
         if (sqlite3_step(stmt) == SQLITE_ROW)
@@ -982,14 +1036,228 @@ bool reminder_mark_read(int reminder_id, int user_id) {
 // ============================================================
 
 // 好友
-bool   friend_request(int, int)                          { return false; }
-string friend_list(int)                                   { return "[]"; }
-bool   friend_handle(int, int)                            { return false; }
-bool   friend_delete(int, int)                            { return false; }
+bool friend_request(int from_id, int to_id) {
+    if (from_id == to_id) return false;
+
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    // 检查是否已经存在好友关系
+    sqlite3_stmt* ck = nullptr;
+    const char* check_sql =
+        "SELECT id, status FROM friendships "
+        "WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?);";
+    bool exists = false;
+    if (sqlite3_prepare_v2(db, check_sql, -1, &ck, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(ck, 1, from_id);
+        sqlite3_bind_int(ck, 2, to_id);
+        sqlite3_bind_int(ck, 3, to_id);
+        sqlite3_bind_int(ck, 4, from_id);
+        if (sqlite3_step(ck) == SQLITE_ROW)
+            exists = true;  // 已存在，不管什么状态都不重复申请
+        sqlite3_finalize(ck);
+    }
+    if (exists) { sqlite3_close(db); return false; }
+
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql =
+        "INSERT INTO friendships (from_id, to_id, status) VALUES (?, ?, 0);";
+    bool ok = false;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, from_id);
+        sqlite3_bind_int(stmt, 2, to_id);
+        ok = (sqlite3_step(stmt) == SQLITE_DONE);
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return ok;
+}
+
+string friend_list(int user_id) {
+    sqlite3* db = open_db();
+    if (!db) return "[]";
+
+    json arr = json::array();
+    sqlite3_stmt* stmt = nullptr;
+
+    // 查所有跟 user_id 相关的好友关系，JOIN users 拿对方信息
+    const char* sql = R"(
+        SELECT f.id, f.from_id, f.to_id, f.status, f.created_at,
+               u.id AS other_id, u.username, u.nickname, u.signature
+        FROM friendships f
+        JOIN users u ON (
+            (f.from_id = ? AND u.id = f.to_id) OR
+            (f.to_id = ? AND u.id = f.from_id)
+        )
+        WHERE f.from_id = ? OR f.to_id = ?
+        ORDER BY f.created_at DESC
+    )";
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, user_id);
+        sqlite3_bind_int(stmt, 2, user_id);
+        sqlite3_bind_int(stmt, 3, user_id);
+        sqlite3_bind_int(stmt, 4, user_id);
+
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            int from_id     = sqlite3_column_int(stmt, 1);
+            int status_int  = sqlite3_column_int(stmt, 3);
+            int other_id    = sqlite3_column_int(stmt, 5);
+
+            json f;
+            f["id"]          = sqlite3_column_int(stmt, 0);
+            f["from_id"]     = from_id;
+            f["to_id"]       = sqlite3_column_int(stmt, 2);
+            f["status"]      = status_int;
+            f["created_at"]  = (const char*)sqlite3_column_text(stmt, 4);
+
+            // 对方信息
+            f["other_id"]    = other_id;
+            f["other_name"]  = (const char*)sqlite3_column_text(stmt, 6);
+            f["other_nick"]  = (const char*)sqlite3_column_text(stmt, 7);
+            f["other_sign"]  = (const char*)sqlite3_column_text(stmt, 8);
+
+            // 方便前端判断：我是哪一方
+            f["i_am_sender"] = (from_id == user_id);
+
+            // 状态文本
+            if (status_int == 0)
+                f["status_text"] = (from_id == user_id) ? "等待对方通过" : "待处理";
+            else if (status_int == 1)
+                f["status_text"] = "已添加";
+            else
+                f["status_text"] = "已拒绝";
+
+            arr.push_back(f);
+        }
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return arr.dump();
+}
+
+bool friend_handle(int friendship_id, int status) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    // 只能把"待通过"改成"已通过"或"已拒绝"
+    const char* sql =
+        "UPDATE friendships SET status=? WHERE id=? AND status=0;";
+
+    sqlite3_stmt* stmt = nullptr;
+    bool ok = false;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, status);
+        sqlite3_bind_int(stmt, 2, friendship_id);
+        ok = (sqlite3_step(stmt) == SQLITE_DONE && sqlite3_changes(db) > 0);
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return ok;
+}
+
+bool friend_delete(int friendship_id, int user_id) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    // 只能删除跟自己有关的好友关系
+    const char* sql =
+        "DELETE FROM friendships WHERE id=? AND (from_id=? OR to_id=?);";
+
+    sqlite3_stmt* stmt = nullptr;
+    bool ok = false;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, friendship_id);
+        sqlite3_bind_int(stmt, 2, user_id);
+        sqlite3_bind_int(stmt, 3, user_id);
+        ok = (sqlite3_step(stmt) == SQLITE_DONE && sqlite3_changes(db) > 0);
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return ok;
+}
 // 聊天
-bool   message_send(int, int, const string&)              { return false; }
-string message_history(int, int)                          { return "[]"; }
-int    message_unread_count(int)                          { return 0; }
+bool message_send(int from_id, int to_id, const string& content) {
+    if (from_id == to_id || content.empty()) return false;
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql = "INSERT INTO messages (from_id, to_id, content, is_read) VALUES (?, ?, ?, 0);";
+    bool ok = false;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, from_id);
+        sqlite3_bind_int(stmt, 2, to_id);
+        sqlite3_bind_text(stmt, 3, content.c_str(), -1, SQLITE_TRANSIENT);
+        ok = (sqlite3_step(stmt) == SQLITE_DONE);
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return ok;
+}
+
+string message_history(int user_id, int friend_id) {
+    sqlite3* db = open_db();
+    if (!db) return "[]";
+
+    json arr = json::array();
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql =
+        "SELECT id, from_id, to_id, content, is_read, created_at "
+        "FROM messages "
+        "WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?) "
+        "ORDER BY created_at ASC;";
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, user_id);
+        sqlite3_bind_int(stmt, 2, friend_id);
+        sqlite3_bind_int(stmt, 3, friend_id);
+        sqlite3_bind_int(stmt, 4, user_id);
+
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            json m;
+            m["id"]         = sqlite3_column_int(stmt, 0);
+            m["from_id"]    = sqlite3_column_int(stmt, 1);
+            m["to_id"]      = sqlite3_column_int(stmt, 2);
+            m["content"]    = (const char*)sqlite3_column_text(stmt, 3);
+            m["is_read"]    = sqlite3_column_int(stmt, 4);
+            m["created_at"] = (const char*)sqlite3_column_text(stmt, 5);
+            m["mine"]       = (sqlite3_column_int(stmt, 1) == user_id);
+            arr.push_back(m);
+        }
+        sqlite3_finalize(stmt);
+
+        // 对方发给我的标记为已读
+        const char* upd =
+            "UPDATE messages SET is_read=1 WHERE from_id=? AND to_id=? AND is_read=0;";
+        if (sqlite3_prepare_v2(db, upd, -1, &stmt, nullptr) == SQLITE_OK) {
+            sqlite3_bind_int(stmt, 1, friend_id);
+            sqlite3_bind_int(stmt, 2, user_id);
+            sqlite3_step(stmt);
+            sqlite3_finalize(stmt);
+        }
+    }
+    sqlite3_close(db);
+    return arr.dump();
+}
+
+int message_unread_count(int user_id) {
+    sqlite3* db = open_db();
+    if (!db) return 0;
+
+    int count = 0;
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql = "SELECT COUNT(*) FROM messages WHERE to_id=? AND is_read=0;";
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, user_id);
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+            count = sqlite3_column_int(stmt, 0);
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return count;
+}
 // 收藏 — 获取列表
 string material_list(int user_id) {
     sqlite3* db = open_db();
@@ -1043,8 +1311,60 @@ bool material_delete(int material_id, int user_id) {
     return ok;
 }
 // 番茄钟
-bool   pomodoro_record(int, int)                          { return false; }
-string pomodoro_today(int)                                { return "[]"; }
+bool pomodoro_record(int user_id, int duration) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    string today = today_str();
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql =
+        "INSERT INTO pomodoros (user_id, duration, date) VALUES (?, ?, ?);";
+    bool ok = false;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, user_id);
+        sqlite3_bind_int(stmt, 2, duration);
+        sqlite3_bind_text(stmt, 3, today.c_str(), -1, SQLITE_TRANSIENT);
+        ok = (sqlite3_step(stmt) == SQLITE_DONE);
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return ok;
+}
+
+string pomodoro_today(int user_id) {
+    sqlite3* db = open_db();
+    if (!db) return "[]";
+
+    string today = today_str();
+    json arr = json::array();
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql =
+        "SELECT id, duration, created_at, date FROM pomodoros "
+        "WHERE user_id = ? AND date = ? ORDER BY created_at ASC;";
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, user_id);
+        sqlite3_bind_text(stmt, 2, today.c_str(), -1, SQLITE_TRANSIENT);
+
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            const char* ca = (const char*)sqlite3_column_text(stmt, 2);
+            string start_time = "-";
+            if (ca) {
+                string s(ca);
+                if (s.length() >= 16) start_time = s.substr(11, 5);  // "HH:MM"
+            }
+            json r;
+            r["id"]         = sqlite3_column_int(stmt, 0);
+            r["duration"]   = sqlite3_column_int(stmt, 1);
+            r["start_time"] = start_time;
+            r["date"]       = (const char*)sqlite3_column_text(stmt, 3);
+            arr.push_back(r);
+        }
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return arr.dump();
+}
 // 名言
 string quote_random() {
     sqlite3* db = open_db();

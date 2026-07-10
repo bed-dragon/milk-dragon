@@ -20,6 +20,15 @@ out/
 dist/
 cmake-build-*/
 
+# Claude Code（本地配置，不提交）
+.claude/
+
+# 依赖
+node_modules/
+
 # OS 文件
 .DS_Store
 Thumbs.db
+
+# 数据库文件（本地数据，不提交，避免合并冲突）
+backend/data/

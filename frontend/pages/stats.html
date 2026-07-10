@@ -38,7 +38,22 @@
         <span class="nav-icon">🍅</span>
         <span class="nav-label">番茄钟</span>
       </a>
+      <a class="nav-item" href="profile.html">
+        <span class="nav-icon">👤</span>
+        <span class="nav-label">个人中心</span>
+      </a>
+      <a class="nav-item" href="friends.html">
+        <span class="nav-icon">👥</span>
+        <span class="nav-label">好友</span>
+      </a>
+      <a class="nav-item" href="materials.html">
+        <span class="nav-icon">📎</span>
+        <span class="nav-label">学习资料</span>
+      </a>
     </nav>
+    <div class="sidebar-user" id="sidebarUserArea">
+      <span class="sidebar-user-name">未登录</span>
+    </div>
   </aside>
 
   <!-- 主区域 -->
@@ -107,10 +122,13 @@
   </div>
 
   <script src="../libs/echarts.min.js"></script>
+  <script src="../js/auth.js"></script>
   <script src="../js/utils.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/navigation.js"></script>
   <script>
+    Auth.guard();
+    Auth.renderSidebarUser();
     let currentRange = 'week';
     let chartAdded = null;
     let chartRate = null;
