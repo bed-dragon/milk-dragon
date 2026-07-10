@@ -297,9 +297,10 @@ async function getMessages(friendId) {
   return data.data || [];
 }
 
-/** 获取未读消息数 → { count: N } */
-async function getUnreadCount() {
-  const data = await request('GET', '/api/messages/unread_count');
+/** 获取未读消息数 → 传 friend_id 则只查该好友 */
+async function getUnreadCount(friendId) {
+  const qs = friendId ? `?friend_id=${friendId}` : '';
+  const data = await request('GET', '/api/messages/unread_count' + qs);
   return data.count || 0;
 }
 

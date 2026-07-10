@@ -125,7 +125,8 @@ void handle_get_messages(const Request& req, Response& res) {
 // GET /api/messages/unread_count
 void handle_unread_count(const Request& req, Response& res) {
     REQUIRE_AUTH(user_id);
-    int count = message_unread_count(user_id);
+    int friend_id = req.has_param("friend_id") ? stoi(req.get_param_value("friend_id")) : 0;
+    int count = message_unread_count(user_id, friend_id);
     json resp = {{"ok", true}, {"count", count}};
     res.set_content(resp.dump(), "application/json");
 }

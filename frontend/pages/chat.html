@@ -71,7 +71,7 @@
     const presetFriendId = params.get('friend');
     const presetFriendName = params.get('name');
 
-    // 加载好友列表
+    // 加载好友列表 + 每个好友的未读数
     async function loadChatFriends() {
       const container = document.getElementById('chatFriendList');
       try {
@@ -81,18 +81,37 @@
           container.innerHTML = '<div class="empty-state" style="padding:12px;"><p style="font-size:var(--font-size-sm);">暂无好友，先去添加吧</p></div>';
           return;
         }
-        container.innerHTML = accepted.map(f => `
-          <div class="friend-item${f.other_id == presetFriendId ? ' active' : ''}" onclick="selectFriend(${f.other_id}, '${(f.other_nick || f.other_name).replace(/'/g, "\\'")}')" data-fid="${f.other_id}">
+
+        // 并行查询每个好友的未读数
+        const unreadMap = {};
+        let totalUnread = 0;
+        await Promise.all(accepted.map(async f => {
+          try {
+            const c = await getUnreadCount(f.other_id);
+            if (c > 0) { unreadMap[f.other_id] = c; totalUnread += c; }
+          } catch(e) {}
+        }));
+
+        // 标题红色徽章
+        const badge = totalUnread > 0 ? ` <span style="background:var(--danger);color:#fff;font-size:11px;padding:1px 6px;border-radius:10px;margin-left:4px;">${totalUnread}</span>` : '';
+        document.getElementById('chatTitle').innerHTML = '💬 聊天' + badge;
+
+        container.innerHTML = accepted.map(f => {
+          const fid = f.other_id;
+          const name = f.other_nick || f.other_name;
+          const uc = unreadMap[fid] || 0;
+          return `
+          <div class="friend-item${fid == presetFriendId ? ' active' : ''}" onclick="selectFriend(${fid}, '${name.replace(/'/g, "\\'")}')" data-fid="${fid}">
             <div class="friend-item-left">
-              <div class="friend-avatar">${(f.other_nick || f.other_name || '?')[0].toUpperCase()}</div>
+              <div class="friend-avatar">${(name || '?')[0].toUpperCase()}</div>
               <div class="friend-info">
-                <div class="friend-name">${f.other_nick || f.other_name}</div>
+                <div class="friend-name">${name}</div>
               </div>
             </div>
+            ${uc > 0 ? `<span style="background:var(--danger);color:#fff;font-size:11px;min-width:18px;height:18px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;">${uc}</span>` : ''}
           </div>
-        `).join('');
+        `}).join('');
 
-        // 如果有预设好友，自动选中
         if (presetFriendId) {
           selectFriend(parseInt(presetFriendId), decodeURIComponent(presetFriendName));
         }
@@ -114,7 +133,10 @@
       // 显示聊天区
       document.getElementById('chatPlaceholder').style.display = 'none';
       document.getElementById('chatArea').style.display = 'flex';
-      document.getElementById('chatTitle').textContent = '💬 ' + friendName;
+      // 保留未读计数
+      const oldBadge = document.getElementById('chatTitle').querySelector('span');
+      const badgeHtml = oldBadge ? ' ' + oldBadge.outerHTML : '';
+      document.getElementById('chatTitle').innerHTML = '💬 ' + friendName + badgeHtml;
 
       refreshMessages();
       // 每3秒自动刷新消息
@@ -132,12 +154,16 @@
           container.innerHTML = '<div class="empty-state"><p style="color:var(--text-muted);">还没有消息，打个招呼吧！</p></div>';
           return;
         }
-        container.innerHTML = messages.map(m => `
-          <div class="chat-bubble ${m.mine ? 'chat-bubble-self' : 'chat-bubble-friend'}">
-            <div>${m.content}</div>
-            <div class="chat-bubble-time">${timeAgo(m.created_at)}</div>
+        container.innerHTML = messages.map(m => {
+          const isUnread = !m.mine && !m.is_read;
+          const unreadStyle = isUnread ? 'background:var(--primary);color:#fff;' : '';
+          const unreadClass = isUnread ? ' chat-bubble-new' : '';
+          return `
+          <div class="chat-bubble ${m.mine ? 'chat-bubble-self' : 'chat-bubble-friend'}${unreadClass}" style="${unreadStyle}">
+            <div style="font-weight:${isUnread ? '600' : '400'}">${m.content}</div>
+            <div class="chat-bubble-time">${formatTimeFull(m.created_at)} ${isUnread ? '<span class="unread-dot"></span>' : ''}</div>
           </div>
-        `).join('');
+        `}).join('');
         // 滚动到底部
         container.scrollTop = container.scrollHeight;
       } catch (e) {
@@ -160,6 +186,7 @@
         if (result.ok) {
           document.getElementById('msgInput').value = '';
           refreshMessages();
+          loadChatFriends();  // 刷新列表清除对面新来的未读（发送不产生自己的未读）
         } else {
           showToast(result.error || '发送失败', 'error');
         }
@@ -181,5 +208,30 @@
 
     loadChatFriends();
   </script>
+  <style>
+    /* 聊天气泡动画 */
+    .chat-bubble-new {
+      animation: bounceIn 0.4s ease;
+    }
+    @keyframes bounceIn {
+      0% { transform: scale(0.3); opacity: 0; }
+      50% { transform: scale(1.05); }
+      70% { transform: scale(0.95); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .unread-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      background: var(--danger);
+      border-radius: 50%;
+      margin-left: 4px;
+      vertical-align: middle;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+  </style>
 </body>
 </html>

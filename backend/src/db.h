@@ -147,7 +147,7 @@ bool   friend_delete(int friendship_id, int user_id);
 // 聊天
 bool   message_send(int from_id, int to_id, const string& content);
 string message_history(int user_id, int friend_id);
-int    message_unread_count(int user_id);
+int    message_unread_count(int user_id, int friend_id = 0);
 
 // 收藏
 string material_list(int user_id);

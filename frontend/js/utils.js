@@ -112,6 +112,24 @@ function showConfirm(message) {
 
 // ── Toast 通知 ──
 
+// ── 时间格式化 ──
+
+/** 将日期字符串转为 HH:MM 或 MM-DD HH:MM 格式 */
+function formatTimeFull(dateStr) {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const MM = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const msgDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  if (msgDate.getTime() === today.getTime()) return hh + ':' + mm;
+  return MM + '-' + dd + ' ' + hh + ':' + mm;
+}
+
 // ── 相对时间 ──
 
 /** 将日期字符串转为相对时间描述（"3分钟前"、"昨天 10:30"等） */
