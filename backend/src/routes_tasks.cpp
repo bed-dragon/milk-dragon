@@ -54,6 +54,12 @@ void handle_create_task(const Request& req, Response& res) { try {
     Task t;
     t.title       = body["title"];
     t.topic       = body.value("topic", "");
+    if (t.title.length() > 50) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"任务标题最多50个字符"})", "application/json"); return;
+    }
+    if (t.topic.length() > 50) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"主题最多50个字符"})", "application/json"); return;
+    }
     t.deadline    = body.value("deadline", "");
     t.priority    = body.value("priority", 1);
     // 兼容前端发 0/1（整数）和 true/false（布尔）
@@ -78,6 +84,12 @@ void handle_update_task(const Request& req, Response& res) { try {
     Task t;
     t.title       = body.value("title", "");
     t.topic       = body.value("topic", "");
+    if (t.title.length() > 50) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"任务标题最多50个字符"})", "application/json"); return;
+    }
+    if (t.topic.length() > 50) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"主题最多50个字符"})", "application/json"); return;
+    }
     t.deadline    = body.value("deadline", "");
     t.priority    = body.value("priority", 1);
     // 只有前端显式传了 status 才更新，否则保留原状态（防打卡状态被覆盖）

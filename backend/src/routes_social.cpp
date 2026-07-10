@@ -100,6 +100,11 @@ void handle_send_message(const Request& req, Response& res) { try {
         res.set_content(R"({"ok":false,"error":"缺少 to_id 或 content"})", "application/json");
         return;
     }
+    if (content.length() > 3000) {
+        res.status = 400;
+        res.set_content(R"({"ok":false,"error":"消息内容过长（最多3000字）"})", "application/json");
+        return;
+    }
     if (message_send(user_id, to_id, content))
         res.set_content(R"({"ok":true})", "application/json");
     else {
