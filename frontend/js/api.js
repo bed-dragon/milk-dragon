@@ -357,77 +357,40 @@ async function getSystemStats() {
 
 const MOCK = {
 
-  // ── 任务 ──
+  // ── 任务 ──（后端离线降级用，仅保留最小样本）
   tasks: [
-    { id: 1, title: '背 30 个英语单词', topic: '英语', deadline: '2026-07-10T18:00', priority: 2, need_review: 1, status: 0, created_at: '2026-07-07 10:00' },
-    { id: 2, title: '复习当天课程笔记', topic: '学习方法', deadline: '2026-07-08T22:00', priority: 1, need_review: 1, status: 0, created_at: '2026-07-07 10:30' },
-    { id: 3, title: '完成 LeetCode 每日一题', topic: '编程', deadline: '2026-07-08T23:59', priority: 2, need_review: 0, status: 0, created_at: '2026-07-07 11:00' },
-    { id: 4, title: '阅读课外书 30 分钟', topic: '阅读', deadline: '2026-07-09T20:00', priority: 3, need_review: 0, status: 1, created_at: '2026-07-06 09:00' },
-    { id: 5, title: '运动 30 分钟', topic: '健康', deadline: '2026-07-08T07:00', priority: 3, need_review: 0, status: 0, created_at: '2026-07-06 08:00' },
+    { id: 1, title: '示例任务', topic: '学习', deadline: '', priority: 2, need_review: 0, status: 0, created_at: '' },
   ],
 
   // ── 推荐任务 ──
   recommended: [
-    { id: 101, title: '背 30 个英语单词', topic: '英语', priority: 2 },
-    { id: 102, title: '复习当天课程笔记', topic: '学习方法', priority: 1 },
-    { id: 103, title: '阅读课外书 30 分钟', topic: '阅读', priority: 3 },
-    { id: 104, title: '完成 LeetCode 每日一题', topic: '编程', priority: 2 },
-    { id: 105, title: '整理课程思维导图', topic: '学习方法', priority: 2 },
-    { id: 106, title: '练习听力 20 分钟', topic: '英语', priority: 2 },
-    { id: 107, title: '写学习日记', topic: '学习方法', priority: 3 },
-    { id: 108, title: '运动 30 分钟', topic: '健康', priority: 3 },
+    { id: 1, title: '背 30 个英语单词', topic: '英语', priority: 2 },
+    { id: 2, title: '完成 LeetCode 每日一题', topic: '编程', priority: 2 },
   ],
 
   // ── 收藏任务 ──
   favorites: [
     { id: 1, title: '背 30 个英语单词', topic: '英语', priority: 2 },
-    { id: 2, title: '完成 LeetCode 每日一题', topic: '编程', priority: 2 },
   ],
 
   // ── 打卡 ──
-  checkins: {
-    '2026-07-07': [
-      { id: 1, task_id: 1, task_title: '背 30 个英语单词', checkin_date: '2026-07-07', checkin_time: '10:30' },
-      { id: 2, task_id: 4, task_title: '阅读课外书 30 分钟', checkin_date: '2026-07-07', checkin_time: '20:05' },
-    ],
-    '2026-07-06': [
-      { id: 3, task_id: 4, task_title: '阅读课外书 30 分钟', checkin_date: '2026-07-06', checkin_time: '20:00' },
-    ],
-    '2026-07-05': [
-      { id: 4, task_id: 4, task_title: '阅读课外书 30 分钟', checkin_date: '2026-07-05', checkin_time: '19:30' },
-    ],
-  },
+  checkins: {},
 
   // ── 统计总览 ──
   overview: {
-    total_tasks: 20,
-    completed: 12,
-    rate: 0.6,
-    streak: 5
+    total_tasks: 0,
+    completed: 0,
+    rate: 0,
+    streak: 0
   },
 
   // ── 每日趋势数据 ──
-  dailyStats: [
-    { date: '07-01', added: 3, completed: 2, rate: 0.67 },
-    { date: '07-02', added: 4, completed: 3, rate: 0.75 },
-    { date: '07-03', added: 2, completed: 1, rate: 0.50 },
-    { date: '07-04', added: 5, completed: 3, rate: 0.60 },
-    { date: '07-05', added: 3, completed: 2, rate: 0.67 },
-    { date: '07-06', added: 2, completed: 1, rate: 0.50 },
-    { date: '07-07', added: 4, completed: 0, rate: 0.00 },
-  ],
+  dailyStats: [],
 
   // ── 提醒 ──
   reminders: {
-    due: [
-      { id: 1, task_title: '复习当天课程笔记', type: 'due', urgency: 'high', remind_date: '2026-07-08', is_read: 0 },
-      { id: 2, task_title: '完成 LeetCode 每日一题', type: 'due', urgency: 'medium', remind_date: '2026-07-08', is_read: 0 },
-      { id: 3, task_title: '运动 30 分钟', type: 'due', urgency: 'low', remind_date: '2026-07-08', is_read: 0 },
-    ],
-    review: [
-      { id: 4, task_title: '背 30 个英语单词', type: 'review', urgency: 'medium', remind_date: '2026-07-08', is_read: 0 },
-      { id: 5, task_title: '阅读课外书 30 分钟', type: 'review', urgency: 'low', remind_date: '2026-07-08', is_read: 1 },
-    ],
+    due: [],
+    review: [],
   },
 
   // ── 番茄钟 ──
@@ -436,12 +399,8 @@ const MOCK = {
   // ── 名言 ──
   quotes: [
     { content: '学而不思则罔，思而不学则殆。', author: '孔子' },
-    { content: '天才是百分之一的灵感，加上百分之九十九的汗水。', author: '爱迪生' },
-    { content: '学习知识要善于思考，思考，再思考。', author: '爱因斯坦' },
     { content: '千里之行，始于足下。', author: '老子' },
-    { content: '读书破万卷，下笔如有神。', author: '杜甫' },
     { content: '知识就是力量。', author: '培根' },
-    { content: '活着就要学习，学习不是为了活着。', author: '培根' },
     { content: '温故而知新，可以为师矣。', author: '孔子' },
   ],
 };
