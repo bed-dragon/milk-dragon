@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学习养成计划 — 推荐任务库</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <!-- 侧边栏 -->
+  <aside class="sidebar"></aside>
+
+  <!-- 主区域 -->
+  <div class="main-wrapper">
+    <header class="topbar">
+      <h1 class="topbar-title">📋 推荐任务库管理</h1>
+      <div class="topbar-right">
+        <span class="topbar-date" id="currentDate"></span>
+      </div>
+    </header>
+
+    <main class="content">
+      <!-- 添加推荐任务 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">➕ 添加推荐任务</h2>
+        </div>
+        <form id="recForm" onsubmit="handleAdd(event)">
+          <div style="display:flex;gap:var(--space-md);flex-wrap:wrap;align-items:flex-end;">
+            <div class="form-group flex-1" style="min-width:200px;">
+              <label class="form-label" for="recTitle">标题</label>
+              <input class="form-input" type="text" id="recTitle" placeholder="任务名称..." required>
+            </div>
+            <div class="form-group flex-1" style="min-width:150px;">
+              <label class="form-label" for="recTopic">主题</label>
+              <input class="form-input" type="text" id="recTopic" placeholder="如：英语、编程...">
+            </div>
+            <div class="form-group" style="min-width:120px;">
+              <label class="form-label" for="recPriority">优先级</label>
+              <select class="form-input" id="recPriority">
+                <option value="1">低</option>
+                <option value="2" selected>中</option>
+                <option value="3">高</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <button type="submit" class="btn btn-primary" id="addBtn">添加</button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- 推荐任务列表 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">📚 推荐任务列表</h2>
+          <button class="btn btn-outline btn-sm" onclick="loadRecommended()">🔄 刷新</button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>标题</th>
+                <th>主题</th>
+                <th>优先级</th>
+                <th>创建时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="recTableBody">
+              <tr><td colspan="6" style="text-align:center;color:var(--text-muted);">加载中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/auth.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/api.js"></script>
+  <script>
+    Auth.guardAdmin();
+    Auth.renderSidebar('admin-tasks');
+    document.getElementById('currentDate').textContent = today();
+
+    async function loadRecommended() {
+      const tbody = document.getElementById('recTableBody');
+      try {
+        const tasks = await getAdminRecommended();
+        if (!tasks.length) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">暂无推荐任务</td></tr>';
+          return;
+        }
+        tbody.innerHTML = tasks.map(t => {
+          return '<tr>'
+            + '<td>' + t.id + '</td>'
+            + '<td><strong>' + t.title + '</strong></td>'
+            + '<td>' + (t.topic || '-') + '</td>'
+            + '<td><span class="tag ' + priorityClass(t.priority) + '">' + priorityLabel(t.priority) + '</span></td>'
+            + '<td>' + (t.created_at || '-') + '</td>'
+            + '<td style="display:flex;gap:8px;">'
+            + '<button class="btn btn-sm btn-outline" onclick="editTask(' + t.id + ', \'' + t.title.replace(/'/g, "\\'") + '\', \'' + (t.topic || '').replace(/'/g, "\\'") + '\', ' + t.priority + ')">编辑</button>'
+            + '<button class="btn btn-sm btn-danger" onclick="removeTask(' + t.id + ', this)">删除</button>'
+            + '</td>'
+            + '</tr>';
+        }).join('');
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--danger);">加载失败：' + e.message + '</td></tr>';
+      }
+    }
+
+    async function handleAdd(e) {
+      e.preventDefault();
+      const title = document.getElementById('recTitle').value.trim();
+      const topic = document.getElementById('recTopic').value.trim();
+      const priority = parseInt(document.getElementById('recPriority').value);
+
+      if (!title) { showToast('请输入标题', 'warning'); return; }
+
+      const btn = document.getElementById('addBtn');
+      btn.disabled = true;
+      btn.textContent = '添加中...';
+
+      try {
+        const result = await addRecommended(title, topic, priority);
+        if (result.ok) {
+          showToast('推荐任务已添加', 'success');
+          document.getElementById('recForm').reset();
+          document.getElementById('recPriority').value = '2';
+          loadRecommended();
+        } else {
+          showToast(result.error || '添加失败', 'error');
+        }
+      } catch (err) {
+        showToast('添加失败：' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '添加';
+      }
+    }
+
+    function editTask(id, title, topic, priority) {
+      const newTitle = prompt('编辑任务标题：', title);
+      if (newTitle === null || !newTitle.trim()) return;
+      const newTopic = prompt('编辑主题：', topic) || '';
+      const newPriority = parseInt(prompt('编辑优先级（1=低, 2=中, 3=高）：', priority)) || priority;
+
+      updateRecommended(id, newTitle.trim(), newTopic.trim(), newPriority)
+        .then(result => {
+          if (result.ok) {
+            showToast('推荐任务已更新', 'success');
+            loadRecommended();
+          } else {
+            showToast(result.error || '更新失败', 'error');
+          }
+        })
+        .catch(err => showToast('更新失败：' + err.message, 'error'));
+    }
+
+    async function removeTask(id, btn) {
+      const confirmed = await showConfirm('确定要删除这条推荐任务吗？');
+      if (!confirmed) return;
+      btn.disabled = true;
+      btn.textContent = '删除中...';
+      try {
+        const result = await deleteRecommended(id);
+        if (result.ok) {
+          showToast('已删除', 'success');
+          loadRecommended();
+        } else {
+          showToast(result.error || '删除失败', 'error');
+          btn.disabled = false;
+          btn.textContent = '删除';
+        }
+      } catch (e) {
+        showToast('删除失败：' + e.message, 'error');
+        btn.disabled = false;
+        btn.textContent = '删除';
+      }
+    }
+
+    loadRecommended();
+  </script>
+</body>
+</html>

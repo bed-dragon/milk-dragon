@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学习养成计划 — 系统统计</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <!-- 侧边栏 -->
+  <aside class="sidebar"></aside>
+
+  <!-- 主区域 -->
+  <div class="main-wrapper">
+    <header class="topbar">
+      <h1 class="topbar-title">📊 系统数据统计</h1>
+      <div class="topbar-right">
+        <span class="topbar-date" id="currentDate"></span>
+      </div>
+    </header>
+
+    <main class="content">
+      <!-- 统计卡片 -->
+      <div class="stat-grid" id="sysStats">
+        <div class="stat-card">
+          <div class="stat-icon">👥</div>
+          <div class="stat-value" id="totalUsers">-</div>
+          <div class="stat-label">总用户数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📋</div>
+          <div class="stat-value" id="totalTasks">-</div>
+          <div class="stat-label">总任务数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">✅</div>
+          <div class="stat-value" id="completedTasks">-</div>
+          <div class="stat-label">已完成任务</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📌</div>
+          <div class="stat-value" id="totalCheckins">-</div>
+          <div class="stat-label">总打卡次数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🍅</div>
+          <div class="stat-value" id="totalPomodoros">-</div>
+          <div class="stat-label">总番茄钟数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🤝</div>
+          <div class="stat-value" id="totalFriendships">-</div>
+          <div class="stat-label">好友关系数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🔥</div>
+          <div class="stat-value" id="activeToday">-</div>
+          <div class="stat-label">今日活跃用户</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📊</div>
+          <div class="stat-value" id="completionRate">-</div>
+          <div class="stat-label">全局完成率</div>
+        </div>
+      </div>
+
+      <!-- 刷新按钮 -->
+      <div style="text-align:center;margin-top:var(--space-lg);">
+        <button class="btn btn-outline" onclick="loadStats()">🔄 刷新数据</button>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/auth.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/api.js"></script>
+  <script>
+    Auth.guardAdmin();
+    Auth.renderSidebar('admin-stats');
+    document.getElementById('currentDate').textContent = today();
+
+    async function loadStats() {
+      try {
+        const stats = await getSystemStats();
+        document.getElementById('totalUsers').textContent = stats.total_users || 0;
+        document.getElementById('totalTasks').textContent = stats.total_tasks || 0;
+        document.getElementById('completedTasks').textContent = stats.completed_tasks || 0;
+        document.getElementById('totalCheckins').textContent = stats.total_checkins || 0;
+        document.getElementById('totalPomodoros').textContent = stats.total_pomodoros || 0;
+        document.getElementById('totalFriendships').textContent = stats.total_friendships || 0;
+        document.getElementById('activeToday').textContent = stats.active_today || 0;
+
+        // 计算全局完成率
+        const total = stats.total_tasks || 0;
+        const completed = stats.completed_tasks || 0;
+        const rate = total > 0 ? Math.round(completed / total * 100) : 0;
+        document.getElementById('completionRate').textContent = rate + '%';
+      } catch (e) {
+        // 全部显示为加载失败
+        ['totalUsers','totalTasks','completedTasks','totalCheckins','totalPomodoros','totalFriendships','activeToday','completionRate'].forEach(id => {
+          document.getElementById(id).textContent = '加载失败';
+        });
+      }
+    }
+
+    loadStats();
+  </script>
+</body>
+</html>

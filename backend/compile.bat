@@ -29,6 +29,7 @@ g++ -std=c++17 ^
     src/routes_checkin.cpp ^
     src/routes_pomodoro.cpp ^
     src/routes_social.cpp ^
+    src/routes_admin.cpp ^
     sqlite3.o ^
     -lws2_32 ^
     -o server.exe
