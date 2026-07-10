@@ -38,6 +38,18 @@
         <span class="nav-icon">🍅</span>
         <span class="nav-label">番茄钟</span>
       </a>
+      <a class="nav-item" href="profile.html">
+        <span class="nav-icon">👤</span>
+        <span class="nav-label">个人中心</span>
+      </a>
+      <a class="nav-item" href="friends.html">
+        <span class="nav-icon">👥</span>
+        <span class="nav-label">好友</span>
+      </a>
+      <a class="nav-item" href="materials.html">
+        <span class="nav-icon">📎</span>
+        <span class="nav-label">学习资料</span>
+      </a>
     </nav>
     <div class="sidebar-user" id="sidebarUserArea">
       <span class="sidebar-user-name">未登录</span>
@@ -149,6 +161,8 @@
     let editingId = null;
 
     document.getElementById('currentDate').textContent = today();
+    // 设置截止时间的最小值为当前时间
+    document.getElementById('taskDeadline').min = new Date().toISOString().slice(0, 16);
 
     // 加载任务列表
     async function loadTasks() {
@@ -197,6 +211,16 @@
       if (!task.title) {
         showToast('请输入任务标题', 'warning');
         return;
+      }
+
+      // 截止时间不能早于当前时间
+      if (task.deadline) {
+        const now = new Date();
+        const dl = new Date(task.deadline);
+        if (dl <= now) {
+          showToast('截止时间不能早于当前时间', 'warning');
+          return;
+        }
       }
 
       try {
