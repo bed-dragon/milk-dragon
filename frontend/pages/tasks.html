@@ -93,20 +93,6 @@
         </form>
       </div>
 
-      <!-- 系统推荐任务 -->
-      <div class="card">
-        <div class="card-header">
-          <h2 class="card-title">⭐ 系统推荐任务</h2>
-          <button class="btn btn-outline btn-sm" onclick="loadRecommended()">刷新推荐</button>
-        </div>
-        <div id="recommendedList">
-          <div class="empty-state">
-            <div class="empty-icon">💡</div>
-            <p>加载推荐任务中...</p>
-          </div>
-        </div>
-      </div>
-
       <!-- 任务列表 -->
       <div class="card">
         <div class="card-header">
@@ -136,6 +122,20 @@
           </table>
         </div>
       </div>
+
+      <!-- 系统推荐任务 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">⭐ 系统推荐任务</h2>
+          <button class="btn btn-outline btn-sm" onclick="loadRecommended()">刷新推荐</button>
+        </div>
+        <div id="recommendedList">
+          <div class="empty-state">
+            <div class="empty-icon">💡</div>
+            <p>加载推荐任务中...</p>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 
@@ -149,6 +149,8 @@
     let editingId = null;
 
     document.getElementById('currentDate').textContent = today();
+    // 设置截止时间的最小值为当前时间
+    document.getElementById('taskDeadline').min = new Date().toISOString().slice(0, 16);
 
     // 加载任务列表
     async function loadTasks() {
@@ -197,6 +199,16 @@
       if (!task.title) {
         showToast('请输入任务标题', 'warning');
         return;
+      }
+
+      // 截止时间不能早于当前时间
+      if (task.deadline) {
+        const now = new Date();
+        const dl = new Date(task.deadline);
+        if (dl <= now) {
+          showToast('截止时间不能早于当前时间', 'warning');
+          return;
+        }
       }
 
       try {
