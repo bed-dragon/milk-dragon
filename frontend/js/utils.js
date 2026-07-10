@@ -112,6 +112,36 @@ function showConfirm(message) {
 
 // ── Toast 通知 ──
 
+// ── 相对时间 ──
+
+/** 将日期字符串转为相对时间描述（"3分钟前"、"昨天 10:30"等） */
+function timeAgo(dateStr) {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const now = new Date();
+  const diff = now - d;
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return '刚刚';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return minutes + '分钟前';
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return hours + '小时前';
+  const days = Math.floor(hours / 24);
+  if (days === 1) return '昨天 ' + formatTimeHM(d);
+  if (days < 7) return days + '天前';
+  return formatDateTime(dateStr);
+}
+
+/** 格式化时间为 HH:MM */
+function formatTimeHM(date) {
+  const h = String(date.getHours()).padStart(2, '0');
+  const m = String(date.getMinutes()).padStart(2, '0');
+  return h + ':' + m;
+}
+
+// ── Toast 通知 ──
+
 /** 显示 Toast 通知（3 秒自动消失） */
 function showToast(message, type = 'info') {
   // 移除已存在的 toast
