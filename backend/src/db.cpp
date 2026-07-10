@@ -65,8 +65,20 @@ void init_tables() {
         );
     )");
 
-    // 兼容旧数据库：如果 role 列不存在则添加
-    exec_sql(db, "ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user';");
+    // 兼容旧数据库：检查 role 列是否存在，不存在才添加
+    {
+        sqlite3_stmt* st = nullptr;
+        bool has_role = false;
+        if (sqlite3_prepare_v2(db, "PRAGMA table_info(users)", -1, &st, nullptr) == SQLITE_OK) {
+            while (sqlite3_step(st) == SQLITE_ROW) {
+                string cn = (const char*)sqlite3_column_text(st, 1);
+                if (cn == "role") { has_role = true; break; }
+            }
+            sqlite3_finalize(st);
+        }
+        if (!has_role)
+            exec_sql(db, "ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user';");
+    }
 
     // 2. 任务表
     exec_sql(db, R"(
