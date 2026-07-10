@@ -220,8 +220,7 @@
           showToast(result.msg || '密码修改失败', 'error');
         }
       } catch (err) {
-        showToast('密码已修改！（模拟）', 'success');
-        document.getElementById('passwordForm').reset();
+        showToast(err.message || '修改失败', 'error');
       } finally {
         btn.disabled = false;
         btn.textContent = '修改密码';

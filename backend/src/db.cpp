@@ -216,6 +216,21 @@ void init_tables() {
     exec_sql(db, "INSERT OR IGNORE INTO recommended_tasks(id,title,topic,priority) VALUES(7,'写学习日记','学习方法',3);");
     exec_sql(db, "INSERT OR IGNORE INTO recommended_tasks(id,title,topic,priority) VALUES(8,'运动30分钟','健康',3);");
 
+    // 13. 收藏任务表（任务模板快速复用）
+    exec_sql(db, R"(
+        CREATE TABLE IF NOT EXISTS favorite_tasks (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    INTEGER NOT NULL,
+            title      TEXT    NOT NULL,
+            topic      TEXT    DEFAULT '',
+            deadline   TEXT    DEFAULT '',
+            priority   INTEGER DEFAULT 1,
+            need_review INTEGER DEFAULT 0,
+            created_at TEXT    DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+    )");
+
     sqlite3_close(db);
     cout << "[OK] Database initialized, all tables ready" << endl;
 
@@ -250,17 +265,18 @@ void init_tables() {
 // ============================================================
 
 // 注册：密码 SHA256 哈希后存入，返回新用户 id，重名返回 -1
-int user_create(const string& username, const string& password) {
+int user_create(const string& username, const string& password, const string& nickname) {
     sqlite3* db = open_db();
     if (!db) return -1;
 
     string hash = sha256(password);
 
-    const char* sql = "INSERT INTO users (username, password_hash) VALUES (?, ?)";
+    const char* sql = "INSERT INTO users (username, password_hash, nickname) VALUES (?, ?, ?)";
     sqlite3_stmt* stmt = nullptr;
     sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
     sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 2, hash.c_str(),     -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, nickname.c_str(), -1, SQLITE_TRANSIENT);
 
     int ok = sqlite3_step(stmt);
     int new_id = (ok == SQLITE_DONE) ? (int)sqlite3_last_insert_rowid(db) : -1;
@@ -427,6 +443,53 @@ string user_search(const string& keyword) {
     sqlite3_finalize(stmt);
     sqlite3_close(db);
     return result;
+}
+
+// 更新个人资料（昵称 + 签名）
+bool user_update_profile(int user_id, const string& nickname, const string& signature) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+    const char* sql = "UPDATE users SET nickname=?, signature=? WHERE id=?";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    sqlite3_bind_text(stmt, 1, nickname.c_str(),  -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, signature.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt,  3, user_id);
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return ok;
+}
+
+// 修改密码：先验证旧密码，再更新
+bool user_change_password(int user_id, const string& old_pwd, const string& new_pwd) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    // 验证旧密码
+    string old_hash = sha256(old_pwd);
+    const char* check = "SELECT id FROM users WHERE id=? AND password_hash=?";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, check, -1, &stmt, 0);
+    sqlite3_bind_int(stmt, 1, user_id);
+    sqlite3_bind_text(stmt, 2, old_hash.c_str(), -1, SQLITE_TRANSIENT);
+    if (sqlite3_step(stmt) != SQLITE_ROW) {
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
+        return false;  // 旧密码不对
+    }
+    sqlite3_finalize(stmt);
+
+    // 更新为新密码
+    string new_hash = sha256(new_pwd);
+    const char* upd = "UPDATE users SET password_hash=?, token='' WHERE id=?";
+    sqlite3_prepare_v2(db, upd, -1, &stmt, 0);
+    sqlite3_bind_text(stmt, 1, new_hash.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 2, user_id);
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return ok;
 }
 
 // ============================================================
@@ -1333,6 +1396,75 @@ bool material_delete(int material_id, int user_id) {
     sqlite3_close(db);
     return ok;
 }
+
+// ============================================================
+// 收藏任务（任务模板快速复用）
+// ============================================================
+
+bool favorite_task_add(int user_id, const Task& t) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    const char* sql = R"(
+        INSERT INTO favorite_tasks (user_id, title, topic, deadline, priority, need_review)
+        VALUES (?, ?, ?, ?, ?, ?)
+    )";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    sqlite3_bind_int(stmt,  1, user_id);
+    sqlite3_bind_text(stmt, 2, t.title.c_str(),    -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, t.topic.c_str(),    -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 4, t.deadline.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt,  5, t.priority);
+    sqlite3_bind_int(stmt,  6, t.need_review ? 1 : 0);
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return ok;
+}
+
+string favorite_task_list(int user_id) {
+    sqlite3* db = open_db();
+    if (!db) return "[]";
+
+    const char* sql = R"(
+        SELECT id, title, topic, priority, need_review
+        FROM favorite_tasks WHERE user_id=? ORDER BY created_at DESC
+    )";
+    sqlite3_stmt* stmt = nullptr;
+    json arr = json::array();
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, user_id);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            json f;
+            f["id"]          = sqlite3_column_int(stmt, 0);
+            f["title"]       = (const char*)sqlite3_column_text(stmt, 1);
+            f["topic"]       = (const char*)sqlite3_column_text(stmt, 2);
+            f["priority"]    = sqlite3_column_int(stmt, 3);
+            f["need_review"] = sqlite3_column_int(stmt, 4);
+            arr.push_back(f);
+        }
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return arr.dump();
+}
+
+bool favorite_task_delete(int favorite_id, int user_id) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    const char* sql = "DELETE FROM favorite_tasks WHERE id=? AND user_id=?";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    sqlite3_bind_int(stmt, 1, favorite_id);
+    sqlite3_bind_int(stmt, 2, user_id);
+    bool ok = sqlite3_step(stmt) == SQLITE_DONE && sqlite3_changes(db) > 0;
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return ok;
+}
+
 // 番茄钟
 bool pomodoro_record(int user_id, int duration) {
     sqlite3* db = open_db();

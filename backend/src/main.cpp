@@ -36,8 +36,11 @@ int main() {
         return Server::HandlerResponse::Unhandled;
     });
 
-    // 4. 提供前端静态文件（html/css/js），一个端口搞定全部
+    // 4. 提供前端静态文件，关闭缓存确保实时生效
     svr.set_mount_point("/", "../frontend");
+    svr.set_post_routing_handler([](const Request& req, Response& res) {
+        res.set_header("Cache-Control", "no-cache, no-store, must-revalidate");
+    });
 
     // 5. 注册 API 路由
     svr.Get("/api/hello", [](const Request& req, Response& res) {
@@ -50,6 +53,11 @@ int main() {
     svr.Post("/api/tasks",             handle_create_task);
     svr.Put(R"(/api/tasks/(\d+))",     handle_update_task);
     svr.Delete(R"(/api/tasks/(\d+))",  handle_delete_task);
+
+    // ---------------- 收藏任务模板 ----------------
+    svr.Post("/api/favorite_tasks",                    handle_favorite_task_add);
+    svr.Get("/api/favorite_tasks",                     handle_favorite_task_list);
+    svr.Delete(R"(/api/favorite_tasks/(\d+))",         handle_favorite_task_delete);
 
     // 辅助：从请求中获取 user_id（优先从 Authorization Bearer token 解析）
     auto get_uid = [](const Request& req) -> int {
@@ -144,6 +152,8 @@ int main() {
     svr.Post("/api/auth/register",  handle_register);
     svr.Post("/api/auth/login",     handle_login);
     svr.Get("/api/me",              handle_get_me);
+    svr.Put("/api/me",              handle_update_profile);
+    svr.Put("/api/me/password",     handle_change_password);
     svr.Get("/api/users/search",    handle_search_users);
 
     // ---------------- 好友与社交 ----------------

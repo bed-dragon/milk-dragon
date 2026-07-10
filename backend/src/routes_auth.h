@@ -8,3 +8,5 @@ void handle_register(const Request& req, Response& res);
 void handle_login(const Request& req, Response& res);
 void handle_get_me(const Request& req, Response& res);
 void handle_search_users(const Request& req, Response& res);
+void handle_update_profile(const Request& req, Response& res);
+void handle_change_password(const Request& req, Response& res);
