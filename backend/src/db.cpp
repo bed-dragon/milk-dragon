@@ -211,6 +211,24 @@ void init_tables() {
     exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(10,'知识就是力量','培根');");
     exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(11,'温故而知新，可以为师矣','孔子');");
     exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(12,'锲而不舍，金石可镂','荀子');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(13,'博学之，审问之，慎思之，明辨之，笃行之','《中庸》');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(14,'敏而好学，不耻下问','孔子');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(15,'读书破万卷，下笔如有神','杜甫');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(16,'纸上得来终觉浅，绝知此事要躬行','陆游');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(17,'盛年不重来，一日难再晨','陶渊明');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(18,'吾生也有涯，而知也无涯','庄子');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(19,'玉不琢，不成器；人不学，不知道','《礼记》');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(20,'学如逆水行舟，不进则退','《增广贤文》');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(21,'三人行，必有我师焉','孔子');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(22,'黑发不知勤学早，白首方悔读书迟','颜真卿');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(23,'非学无以广才，非志无以成学','诸葛亮');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(24,'路漫漫其修远兮，吾将上下而求索','屈原');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(25,'问渠那得清如许，为有源头活水来','朱熹');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(26,'三更灯火五更鸡，正是男儿读书时','颜真卿');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(27,'莫等闲，白了少年头，空悲切','岳飞');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(28,'学以致用','梁启超');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(29,'为中华之崛起而读书','周恩来');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(30,'天下事有难易乎？为之，则难者亦易矣','彭端淑');");
 
     // 12. 推荐任务表（含种子数据）
     exec_sql(db, R"(
