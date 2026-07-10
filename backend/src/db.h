@@ -19,6 +19,7 @@ struct User {
     string nickname;
     string signature;
     string token;
+    string role = "user";
     string created_at;
 };
 
@@ -164,3 +165,14 @@ bool   favorite_task_delete(int favorite_id, int user_id);
 
 // 名言
 string quote_random();
+
+// 管理员
+string user_list_all();
+bool   user_update_role(int user_id, const string& role);
+bool   user_delete(int user_id);
+bool   user_is_admin(int user_id);
+string task_recommended_all();
+bool   task_recommended_add(const string& title, const string& topic, int priority);
+bool   task_recommended_update(int id, const string& title, const string& topic, int priority);
+bool   task_recommended_delete(int id);
+string stats_system();

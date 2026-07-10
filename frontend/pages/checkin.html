@@ -8,53 +8,7 @@
 </head>
 <body>
   <!-- 侧边栏 -->
-  <aside class="sidebar">
-    <div class="sidebar-brand">
-      <span class="brand-icon">📚</span>
-      <span>学习养成计划</span>
-    </div>
-    <nav class="sidebar-nav">
-      <a class="nav-item" href="../index.html">
-        <span class="nav-icon">📊</span>
-        <span class="nav-label">仪表盘</span>
-      </a>
-      <a class="nav-item" href="tasks.html">
-        <span class="nav-icon">📋</span>
-        <span class="nav-label">任务管理</span>
-      </a>
-      <a class="nav-item active" href="checkin.html">
-        <span class="nav-icon">✅</span>
-        <span class="nav-label">打卡</span>
-      </a>
-      <a class="nav-item" href="stats.html">
-        <span class="nav-icon">📈</span>
-        <span class="nav-label">数据分析</span>
-      </a>
-      <a class="nav-item" href="reminders.html">
-        <span class="nav-icon">🔔</span>
-        <span class="nav-label">提醒中心</span>
-      </a>
-      <a class="nav-item" href="pomodoro.html">
-        <span class="nav-icon">🍅</span>
-        <span class="nav-label">番茄钟</span>
-      </a>
-      <a class="nav-item" href="profile.html">
-        <span class="nav-icon">👤</span>
-        <span class="nav-label">个人中心</span>
-      </a>
-      <a class="nav-item" href="friends.html">
-        <span class="nav-icon">👥</span>
-        <span class="nav-label">好友</span>
-      </a>
-      <a class="nav-item" href="materials.html">
-        <span class="nav-icon">📎</span>
-        <span class="nav-label">学习资料</span>
-      </a>
-    </nav>
-    <div class="sidebar-user" id="sidebarUserArea">
-      <span class="sidebar-user-name">未登录</span>
-    </div>
-  </aside>
+  <aside class="sidebar"></aside>
 
   <!-- 主区域 -->
   <div class="main-wrapper">
@@ -143,14 +97,49 @@
   <script src="../js/navigation.js"></script>
   <script>
     Auth.guard();
-    Auth.renderSidebarUser();
+    Auth.renderSidebar('checkin');
     let currentMonth = new Date().getMonth();
     let currentYear = new Date().getFullYear();
     let checkinDates = new Set();
+    let stampMap = {};  // { '2026-07-10': 1, '2026-07-11': 2, ... } 每个日期固定的印章编号
+
+    // 根据日期字符串确定印章编号（保证同一日期始终相同）
+    function getStampForDate(dateStr) {
+      if (stampMap[dateStr]) return stampMap[dateStr];
+      // 用日期作哈希，保证同一日期固定同一个章
+      const hash = dateStr.split('-').reduce((acc, s) => acc + parseInt(s), 0);
+      const num = (hash % 3) + 1;
+      stampMap[dateStr] = num;
+      return num;
+    }
+
+    // 加载所有有打卡的日期（用于日历印章展示）
+    async function loadAllCheckinDates() {
+      checkinDates = new Set();
+      stampMap = {};
+      try {
+        // 尝试从后端获取所有打卡记录（不传日期参数 = 查全部）
+        const raw = await request('GET', '/api/checkin');
+        if (raw.data && raw.data.length) {
+          raw.data.forEach(c => {
+            if (c.checkin_date) {
+              checkinDates.add(c.checkin_date);
+              getStampForDate(c.checkin_date);  // 预生成固定印章编号
+            }
+          });
+          return;
+        }
+      } catch (e) { /* 降级到 MOCK */ }
+      // MOCK 降级
+      Object.keys(MOCK.checkins).forEach(d => {
+        checkinDates.add(d);
+        getStampForDate(d);
+      });
+    }
 
     document.getElementById('currentDate').textContent = today();
     document.getElementById('checkinDate').value = today();
-    loadMonthCheckins().then(() => renderCalendar());
+    loadAllCheckinDates().then(() => renderCalendar());
     loadCheckinData();
 
     function setToday() {
@@ -164,22 +153,6 @@
       d.setDate(d.getDate() + offset);
       input.value = formatDate(d);
       loadCheckinData();
-    }
-
-    // 首次加载：拉取当月所有打卡日期，填充日历
-    async function loadMonthCheckins() {
-      const firstDay = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-01`;
-      const lastDay = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${new Date(currentYear, currentMonth+1, 0).getDate()}`;
-      try {
-        // 拉取本月所有打卡记录
-        const data = await request('GET', `/api/checkins?user_id=1`);
-        (data.data || []).forEach(c => {
-          if (c.date || c.checkin_date) checkinDates.add(c.date || c.checkin_date);
-        });
-      } catch (e) {
-        // MOCK fallback
-        Object.keys(MOCK.checkins || {}).forEach(d => checkinDates.add(d));
-      }
     }
 
     async function loadCheckinData() {
@@ -251,6 +224,10 @@
     // 打卡操作
     async function doCheckin(taskId) {
       const date = document.getElementById('checkinDate').value;
+      // 打卡时随机选一个印章（定下来就不变了）
+      if (!stampMap[date]) {
+        stampMap[date] = Math.floor(Math.random() * 3) + 1;
+      }
       try {
         await _doCheckin(taskId, date);
         showToast('打卡成功！🎉', 'success');
@@ -290,16 +267,18 @@
         const dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         const isToday = dateStr === todayStr;
         const isChecked = checkinDates.has(dateStr);
+        const stampNum = stampMap[dateStr] || '';
+        const stampClass = stampNum ? ' stamp-' + stampNum : '';
 
         let bg = 'transparent', color = 'var(--text-primary)', fw = '400';
-        if (isChecked) { bg = 'var(--success)'; color = '#fff'; fw = '600'; }
-        else if (isToday) { bg = 'var(--primary)'; color = '#fff'; fw = '600'; }
+        if (isChecked && !stampNum) { bg = 'var(--success)'; color = '#fff'; fw = '600'; }
+        else if (isToday && !isChecked) { bg = 'var(--primary)'; color = '#fff'; fw = '600'; }
 
-        html += `<div style="cursor:pointer;padding:5px 2px;border-radius:4px;font-size:12px;font-weight:${fw};background:${bg};color:${color};" onclick="pickDate('${dateStr}')">${d}</div>`;
+        html += `<div class="calendar-day${isToday ? ' today' : ''}${isChecked ? ' checked' : ''}${stampClass}" onclick="pickDate('${dateStr}')" style="background:${bg};color:${color};font-weight:${fw};cursor:pointer;"><span class="day-text">${d}</span></div>`;
       }
 
       html += '</div>';
-      html += '<div style="display:flex;gap:10px;font-size:11px;color:var(--text-muted);padding:6px 0 0;">🟢已打卡 🔵今天</div>';
+      html += '<div style="display:flex;gap:10px;font-size:11px;color:var(--text-muted);padding:6px 0 0;">🐉已打卡 🔵今天</div>';
 
       grid.innerHTML = html;
     }
@@ -323,13 +302,13 @@
     function prevMonth() {
       currentMonth--;
       if (currentMonth < 0) { currentMonth = 11; currentYear--; }
-      loadMonthCheckins().then(() => renderCalendar());
+      loadAllCheckinDates().then(() => renderCalendar());
     }
 
     function nextMonth() {
       currentMonth++;
       if (currentMonth > 11) { currentMonth = 0; currentYear++; }
-      loadMonthCheckins().then(() => renderCalendar());
+      loadAllCheckinDates().then(() => renderCalendar());
     }
 
     // 加载打卡记录列表

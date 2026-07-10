@@ -32,3 +32,7 @@ Thumbs.db
 
 # 数据库文件（本地数据，不提交，避免合并冲突）
 backend/data/
+backend/server.exe
+backend/sqlite3.o
+backend/*.exe
+backend/*.o

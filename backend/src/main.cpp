@@ -10,6 +10,7 @@
 #include "routes_checkin.h"
 #include "routes_pomodoro.h"
 #include "routes_social.h"
+#include "routes_admin.h"
 
 using namespace httplib;
 using json = nlohmann::json;
@@ -181,6 +182,16 @@ int main() {
         json resp = {{"ok", true}, {"data", json::parse(data_str)}};
         res.set_content(resp.dump(), "application/json");
     });
+
+    // ---------------- 管理员接口 ----------------
+    svr.Get("/api/admin/users",                    handle_admin_users);
+    svr.Put(R"(/api/admin/users/(\d+)/role)",      handle_admin_user_role);
+    svr.Delete(R"(/api/admin/users/(\d+))",        handle_admin_user_delete);
+    svr.Get("/api/admin/recommended",               handle_admin_recommended);
+    svr.Post("/api/admin/recommended",              handle_admin_recommended_add);
+    svr.Put(R"(/api/admin/recommended/(\d+))",     handle_admin_recommended_update);
+    svr.Delete(R"(/api/admin/recommended/(\d+))",  handle_admin_recommended_delete);
+    svr.Get("/api/admin/stats",                     handle_admin_stats);
 
     // 5. 设置前端静态文件目录
     svr.set_mount_point("/", "../frontend");

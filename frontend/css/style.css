@@ -610,14 +610,46 @@ tbody tr:hover {
 .calendar-day:hover {
   background: var(--bg-body);
 }
-.calendar-day.checked::after {
+.calendar-day.checked {
+  position: relative;
+  overflow: hidden;
+}
+.calendar-day.checked::before {
   content: '';
   position: absolute;
-  bottom: 4px;
-  width: 6px;
-  height: 6px;
-  background: var(--success);
+  inset: 3px;
   border-radius: 50%;
+  opacity: 0.50;
+  pointer-events: none;
+  animation: stampIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border: 2px solid rgba(255, 71, 87, 0.3);
+}
+.calendar-day.stamp-1::before { background: url('../images/stamp-1.jpg') center / cover no-repeat; }
+.calendar-day.stamp-2::before { background: url('../images/stamp-2.jpg') center / cover no-repeat; }
+.calendar-day.stamp-3::before { background: url('../images/stamp-3.jpg') center / cover no-repeat; }
+.calendar-day.checked .day-text {
+  position: relative;
+  z-index: 1;
+  font-weight: 700;
+}
+
+@keyframes stampIn {
+  0% {
+    transform: scale(2.5) rotate(-15deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(0.85) rotate(3deg);
+    opacity: 0.65;
+  }
+  70% {
+    transform: scale(1.05) rotate(-1deg);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 0.50;
+  }
 }
 .calendar-day.today {
   font-weight: 700;
@@ -1057,6 +1089,101 @@ tbody tr:nth-child(even) {
   .sidebar-user {
     display: none;
   }
+}
+
+/* ── 侧边栏管理区域 ── */
+.sidebar-divider {
+  height: 1px;
+  background: rgba(255,255,255,0.12);
+  margin: 8px 16px;
+}
+
+.sidebar-section-title {
+  color: rgba(255,255,255,0.45);
+  font-size: var(--font-size-xs);
+  padding: 4px 20px 2px;
+  letter-spacing: 1px;
+}
+
+.admin-nav-item {
+  /* 管理菜单项用金色系区分 */
+}
+
+.admin-nav-item .nav-icon {
+  /* 金色图标 */
+  filter: hue-rotate(40deg);
+}
+
+.admin-nav-item:hover {
+  background: rgba(255, 215, 0, 0.1);
+}
+
+.admin-nav-item.active {
+  background: linear-gradient(135deg, #d4a017, #b8860b);
+}
+
+/* ── 管理页面通用样式 ── */
+.search-box {
+  display: flex;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.search-result-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.friend-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: var(--font-size-lg);
+  flex-shrink: 0;
+}
+
+.friend-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.friend-item-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.friend-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.friend-name {
+  font-weight: 600;
+  font-size: var(--font-size-base);
+}
+
+.friend-sign {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.friend-actions {
+  display: flex;
+  gap: 8px;
 }
 
 /* ============================================
