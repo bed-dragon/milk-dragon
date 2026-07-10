@@ -25,8 +25,8 @@
         <div class="pomodoro-timer">
           <!-- 时长选择 -->
           <div style="display:flex;justify-content:center;gap:8px;margin-bottom:20px;flex-wrap:wrap;" id="durationPresets">
-            <button class="btn btn-sm btn-primary" onclick="setDuration(15)" data-preset="15">15 分钟</button>
-            <button class="btn btn-sm btn-outline" onclick="setDuration(25)" data-preset="25">25 分钟</button>
+            <button class="btn btn-sm btn-outline" onclick="setDuration(15)" data-preset="15">15 分钟</button>
+            <button class="btn btn-sm btn-primary" onclick="setDuration(25)" data-preset="25">25 分钟</button>
             <button class="btn btn-sm btn-outline" onclick="setDuration(45)" data-preset="45">45 分钟</button>
             <button class="btn btn-sm btn-outline" onclick="setDuration(60)" data-preset="60">60 分钟</button>
             <span style="display:flex;align-items:center;gap:4px;">
@@ -121,6 +121,8 @@
 
     function setDuration(minutes) {
       if (isRunning) return;  // 运行中不能改
+      // 限制 1~120 分钟，防止负数
+      minutes = Math.max(1, Math.min(120, parseInt(minutes) || 25));
       currentMinutes = minutes;
       totalSeconds = minutes * 60;
       remainingSeconds = totalSeconds;
