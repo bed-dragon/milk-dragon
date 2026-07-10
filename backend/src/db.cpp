@@ -60,9 +60,25 @@ void init_tables() {
             nickname      TEXT    DEFAULT '',
             signature     TEXT    DEFAULT '',
             token         TEXT    DEFAULT '',
+            role          TEXT    DEFAULT 'user',
             created_at    TEXT    DEFAULT (datetime('now','localtime'))
         );
     )");
+
+    // 兼容旧数据库：检查 role 列是否存在，不存在才添加
+    {
+        sqlite3_stmt* st = nullptr;
+        bool has_role = false;
+        if (sqlite3_prepare_v2(db, "PRAGMA table_info(users)", -1, &st, nullptr) == SQLITE_OK) {
+            while (sqlite3_step(st) == SQLITE_ROW) {
+                string cn = (const char*)sqlite3_column_text(st, 1);
+                if (cn == "role") { has_role = true; break; }
+            }
+            sqlite3_finalize(st);
+        }
+        if (!has_role)
+            exec_sql(db, "ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user';");
+    }
 
     // 2. 任务表
     exec_sql(db, R"(
@@ -195,6 +211,24 @@ void init_tables() {
     exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(10,'知识就是力量','培根');");
     exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(11,'温故而知新，可以为师矣','孔子');");
     exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(12,'锲而不舍，金石可镂','荀子');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(13,'博学之，审问之，慎思之，明辨之，笃行之','《中庸》');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(14,'敏而好学，不耻下问','孔子');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(15,'读书破万卷，下笔如有神','杜甫');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(16,'纸上得来终觉浅，绝知此事要躬行','陆游');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(17,'盛年不重来，一日难再晨','陶渊明');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(18,'吾生也有涯，而知也无涯','庄子');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(19,'玉不琢，不成器；人不学，不知道','《礼记》');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(20,'学如逆水行舟，不进则退','《增广贤文》');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(21,'三人行，必有我师焉','孔子');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(22,'黑发不知勤学早，白首方悔读书迟','颜真卿');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(23,'非学无以广才，非志无以成学','诸葛亮');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(24,'路漫漫其修远兮，吾将上下而求索','屈原');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(25,'问渠那得清如许，为有源头活水来','朱熹');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(26,'三更灯火五更鸡，正是男儿读书时','颜真卿');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(27,'莫等闲，白了少年头，空悲切','岳飞');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(28,'学以致用','梁启超');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(29,'为中华之崛起而读书','周恩来');");
+    exec_sql(db, "INSERT OR IGNORE INTO quotes(id,content,author) VALUES(30,'天下事有难易乎？为之，则难者亦易矣','彭端淑');");
 
     // 12. 推荐任务表（含种子数据）
     exec_sql(db, R"(
@@ -215,6 +249,21 @@ void init_tables() {
     exec_sql(db, "INSERT OR IGNORE INTO recommended_tasks(id,title,topic,priority) VALUES(6,'练习听力20分钟','英语',2);");
     exec_sql(db, "INSERT OR IGNORE INTO recommended_tasks(id,title,topic,priority) VALUES(7,'写学习日记','学习方法',3);");
     exec_sql(db, "INSERT OR IGNORE INTO recommended_tasks(id,title,topic,priority) VALUES(8,'运动30分钟','健康',3);");
+
+    // 13. 收藏任务表（任务模板快速复用）
+    exec_sql(db, R"(
+        CREATE TABLE IF NOT EXISTS favorite_tasks (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    INTEGER NOT NULL,
+            title      TEXT    NOT NULL,
+            topic      TEXT    DEFAULT '',
+            deadline   TEXT    DEFAULT '',
+            priority   INTEGER DEFAULT 1,
+            need_review INTEGER DEFAULT 0,
+            created_at TEXT    DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+    )");
 
     sqlite3_close(db);
     cout << "[OK] Database initialized, all tables ready" << endl;
@@ -239,6 +288,9 @@ void init_tables() {
         seed_user("demo",  "123456",   "演示账号");
         seed_user("admin", "admin123", "管理员");
 
+        // 确保管理员拥有 admin 角色
+        exec_sql(db2, "UPDATE users SET role='admin' WHERE username='admin';");
+
         sqlite3_finalize(stmt);
         sqlite3_close(db2);
         cout << "[OK] Test users seeded" << endl;
@@ -250,17 +302,18 @@ void init_tables() {
 // ============================================================
 
 // 注册：密码 SHA256 哈希后存入，返回新用户 id，重名返回 -1
-int user_create(const string& username, const string& password) {
+int user_create(const string& username, const string& password, const string& nickname) {
     sqlite3* db = open_db();
     if (!db) return -1;
 
     string hash = sha256(password);
 
-    const char* sql = "INSERT INTO users (username, password_hash) VALUES (?, ?)";
+    const char* sql = "INSERT INTO users (username, password_hash, nickname) VALUES (?, ?, ?)";
     sqlite3_stmt* stmt = nullptr;
     sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
     sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 2, hash.c_str(),     -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, nickname.c_str(), -1, SQLITE_TRANSIENT);
 
     int ok = sqlite3_step(stmt);
     int new_id = (ok == SQLITE_DONE) ? (int)sqlite3_last_insert_rowid(db) : -1;
@@ -382,7 +435,7 @@ string user_get_info(int user_id) {
     sqlite3* db = open_db();
     if (!db) return "{}";
 
-    const char* sql = "SELECT id, username, nickname, signature, created_at FROM users WHERE id=?";
+    const char* sql = "SELECT id, username, nickname, signature, role, created_at FROM users WHERE id=?";
     sqlite3_stmt* stmt = nullptr;
     sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
     sqlite3_bind_int(stmt, 1, user_id);
@@ -394,7 +447,8 @@ string user_get_info(int user_id) {
         result += "\"username\":\"" + string((const char*)sqlite3_column_text(stmt, 1)) + "\",";
         result += "\"nickname\":\"" + string((const char*)sqlite3_column_text(stmt, 2)) + "\",";
         result += "\"signature\":\"" + string((const char*)sqlite3_column_text(stmt, 3)) + "\",";
-        result += "\"created_at\":\"" + string((const char*)sqlite3_column_text(stmt, 4)) + "\"";
+        result += "\"role\":\""      + string((const char*)sqlite3_column_text(stmt, 4)) + "\",";
+        result += "\"created_at\":\"" + string((const char*)sqlite3_column_text(stmt, 5)) + "\"";
         result += "}";
     }
 
@@ -427,6 +481,53 @@ string user_search(const string& keyword) {
     sqlite3_finalize(stmt);
     sqlite3_close(db);
     return result;
+}
+
+// 更新个人资料（昵称 + 签名）
+bool user_update_profile(int user_id, const string& nickname, const string& signature) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+    const char* sql = "UPDATE users SET nickname=?, signature=? WHERE id=?";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    sqlite3_bind_text(stmt, 1, nickname.c_str(),  -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, signature.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt,  3, user_id);
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return ok;
+}
+
+// 修改密码：先验证旧密码，再更新
+bool user_change_password(int user_id, const string& old_pwd, const string& new_pwd) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    // 验证旧密码
+    string old_hash = sha256(old_pwd);
+    const char* check = "SELECT id FROM users WHERE id=? AND password_hash=?";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, check, -1, &stmt, 0);
+    sqlite3_bind_int(stmt, 1, user_id);
+    sqlite3_bind_text(stmt, 2, old_hash.c_str(), -1, SQLITE_TRANSIENT);
+    if (sqlite3_step(stmt) != SQLITE_ROW) {
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
+        return false;  // 旧密码不对
+    }
+    sqlite3_finalize(stmt);
+
+    // 更新为新密码
+    string new_hash = sha256(new_pwd);
+    const char* upd = "UPDATE users SET password_hash=?, token='' WHERE id=?";
+    sqlite3_prepare_v2(db, upd, -1, &stmt, 0);
+    sqlite3_bind_text(stmt, 1, new_hash.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 2, user_id);
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return ok;
 }
 
 // ============================================================
@@ -1333,6 +1434,75 @@ bool material_delete(int material_id, int user_id) {
     sqlite3_close(db);
     return ok;
 }
+
+// ============================================================
+// 收藏任务（任务模板快速复用）
+// ============================================================
+
+bool favorite_task_add(int user_id, const Task& t) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    const char* sql = R"(
+        INSERT INTO favorite_tasks (user_id, title, topic, deadline, priority, need_review)
+        VALUES (?, ?, ?, ?, ?, ?)
+    )";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    sqlite3_bind_int(stmt,  1, user_id);
+    sqlite3_bind_text(stmt, 2, t.title.c_str(),    -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, t.topic.c_str(),    -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 4, t.deadline.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt,  5, t.priority);
+    sqlite3_bind_int(stmt,  6, t.need_review ? 1 : 0);
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return ok;
+}
+
+string favorite_task_list(int user_id) {
+    sqlite3* db = open_db();
+    if (!db) return "[]";
+
+    const char* sql = R"(
+        SELECT id, title, topic, priority, need_review
+        FROM favorite_tasks WHERE user_id=? ORDER BY created_at DESC
+    )";
+    sqlite3_stmt* stmt = nullptr;
+    json arr = json::array();
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, user_id);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            json f;
+            f["id"]          = sqlite3_column_int(stmt, 0);
+            f["title"]       = (const char*)sqlite3_column_text(stmt, 1);
+            f["topic"]       = (const char*)sqlite3_column_text(stmt, 2);
+            f["priority"]    = sqlite3_column_int(stmt, 3);
+            f["need_review"] = sqlite3_column_int(stmt, 4);
+            arr.push_back(f);
+        }
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return arr.dump();
+}
+
+bool favorite_task_delete(int favorite_id, int user_id) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    const char* sql = "DELETE FROM favorite_tasks WHERE id=? AND user_id=?";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    sqlite3_bind_int(stmt, 1, favorite_id);
+    sqlite3_bind_int(stmt, 2, user_id);
+    bool ok = sqlite3_step(stmt) == SQLITE_DONE && sqlite3_changes(db) > 0;
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return ok;
+}
+
 // 番茄钟
 bool pomodoro_record(int user_id, int duration) {
     sqlite3* db = open_db();
@@ -1410,4 +1580,253 @@ string quote_random() {
     }
     sqlite3_close(db);
     return obj.dump();
+}
+
+// ============================================================
+// 管理员功能
+// ============================================================
+
+// 获取全部用户列表
+string user_list_all() {
+    sqlite3* db = open_db();
+    if (!db) return "[]";
+
+    json arr = json::array();
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql =
+        "SELECT id, username, nickname, signature, role, created_at "
+        "FROM users ORDER BY id ASC;";
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            json u;
+            u["id"]         = sqlite3_column_int(stmt, 0);
+            u["username"]   = (const char*)sqlite3_column_text(stmt, 1);
+            u["nickname"]   = (const char*)sqlite3_column_text(stmt, 2);
+            u["signature"]  = (const char*)sqlite3_column_text(stmt, 3);
+            u["role"]       = (const char*)sqlite3_column_text(stmt, 4);
+            u["created_at"] = (const char*)sqlite3_column_text(stmt, 5);
+            arr.push_back(u);
+        }
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return arr.dump();
+}
+
+// 修改用户角色
+bool user_update_role(int user_id, const string& role) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    const char* sql = "UPDATE users SET role=? WHERE id=?;";
+    sqlite3_stmt* stmt = nullptr;
+    bool ok = false;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, role.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int(stmt, 2, user_id);
+        ok = (sqlite3_step(stmt) == SQLITE_DONE && sqlite3_changes(db) > 0);
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return ok;
+}
+
+// 删除用户
+bool user_delete(int user_id) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    // 删除用户及相关数据
+    exec_sql(db, "DELETE FROM tasks WHERE user_id=" + to_string(user_id) + ";");
+    exec_sql(db, "DELETE FROM checkins WHERE user_id=" + to_string(user_id) + ";");
+    exec_sql(db, "DELETE FROM signins WHERE user_id=" + to_string(user_id) + ";");
+    exec_sql(db, "DELETE FROM reminders WHERE user_id=" + to_string(user_id) + ";");
+    exec_sql(db, "DELETE FROM friendships WHERE from_id=" + to_string(user_id) + " OR to_id=" + to_string(user_id) + ";");
+    exec_sql(db, "DELETE FROM messages WHERE from_id=" + to_string(user_id) + " OR to_id=" + to_string(user_id) + ";");
+    exec_sql(db, "DELETE FROM materials WHERE user_id=" + to_string(user_id) + ";");
+    exec_sql(db, "DELETE FROM pomodoros WHERE user_id=" + to_string(user_id) + ";");
+
+    const char* sql = "DELETE FROM users WHERE id=?;";
+    sqlite3_stmt* stmt = nullptr;
+    bool ok = false;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, user_id);
+        ok = (sqlite3_step(stmt) == SQLITE_DONE && sqlite3_changes(db) > 0);
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return ok;
+}
+
+// 检查是否是管理员
+bool user_is_admin(int user_id) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    const char* sql = "SELECT role FROM users WHERE id=?;";
+    sqlite3_stmt* stmt = nullptr;
+    bool is_admin = false;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, user_id);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            string role = (const char*)sqlite3_column_text(stmt, 0);
+            is_admin = (role == "admin");
+        }
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return is_admin;
+}
+
+// 获取推荐任务库全部数据（管理员视角，含时间）
+string task_recommended_all() {
+    sqlite3* db = open_db();
+    if (!db) return "[]";
+
+    json arr = json::array();
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql =
+        "SELECT id, title, topic, priority, created_at FROM recommended_tasks ORDER BY id ASC;";
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            json t;
+            t["id"]         = sqlite3_column_int(stmt, 0);
+            t["title"]      = (const char*)sqlite3_column_text(stmt, 1);
+            t["topic"]      = (const char*)sqlite3_column_text(stmt, 2);
+            t["priority"]   = sqlite3_column_int(stmt, 3);
+            t["created_at"] = (const char*)sqlite3_column_text(stmt, 4);
+            arr.push_back(t);
+        }
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return arr.dump();
+}
+
+// 添加推荐任务
+bool task_recommended_add(const string& title, const string& topic, int priority) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    const char* sql = "INSERT INTO recommended_tasks (title, topic, priority) VALUES (?, ?, ?);";
+    sqlite3_stmt* stmt = nullptr;
+    bool ok = false;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, title.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 2, topic.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int(stmt, 3, priority);
+        ok = (sqlite3_step(stmt) == SQLITE_DONE);
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return ok;
+}
+
+// 更新推荐任务
+bool task_recommended_update(int id, const string& title, const string& topic, int priority) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    const char* sql = "UPDATE recommended_tasks SET title=?, topic=?, priority=? WHERE id=?;";
+    sqlite3_stmt* stmt = nullptr;
+    bool ok = false;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, title.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 2, topic.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int(stmt, 3, priority);
+        sqlite3_bind_int(stmt, 4, id);
+        ok = (sqlite3_step(stmt) == SQLITE_DONE && sqlite3_changes(db) > 0);
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return ok;
+}
+
+// 删除推荐任务
+bool task_recommended_delete(int id) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    const char* sql = "DELETE FROM recommended_tasks WHERE id=?;";
+    sqlite3_stmt* stmt = nullptr;
+    bool ok = false;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, id);
+        ok = (sqlite3_step(stmt) == SQLITE_DONE && sqlite3_changes(db) > 0);
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return ok;
+}
+
+// 系统全局统计
+string stats_system() {
+    sqlite3* db = open_db();
+    if (!db) return "{}";
+
+    json result;
+    sqlite3_stmt* stmt = nullptr;
+
+    // 总用户数
+    if (sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM users;", -1, &stmt, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+            result["total_users"] = sqlite3_column_int(stmt, 0);
+        sqlite3_finalize(stmt);
+    }
+
+    // 总任务数
+    if (sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM tasks;", -1, &stmt, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+            result["total_tasks"] = sqlite3_column_int(stmt, 0);
+        sqlite3_finalize(stmt);
+    }
+
+    // 已完成任务数
+    if (sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM tasks WHERE status=1;", -1, &stmt, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+            result["completed_tasks"] = sqlite3_column_int(stmt, 0);
+        sqlite3_finalize(stmt);
+    }
+
+    // 总打卡次数
+    if (sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM checkins;", -1, &stmt, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+            result["total_checkins"] = sqlite3_column_int(stmt, 0);
+        sqlite3_finalize(stmt);
+    }
+
+    // 总番茄钟次数
+    if (sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM pomodoros;", -1, &stmt, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+            result["total_pomodoros"] = sqlite3_column_int(stmt, 0);
+        sqlite3_finalize(stmt);
+    }
+
+    // 好友关系数
+    if (sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM friendships WHERE status=1;", -1, &stmt, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+            result["total_friendships"] = sqlite3_column_int(stmt, 0);
+        sqlite3_finalize(stmt);
+    }
+
+    // 今日活跃用户数（今天打过卡或记录过番茄钟）
+    string today = today_str();
+    if (sqlite3_prepare_v2(db,
+            "SELECT COUNT(DISTINCT user_id) FROM ("
+            "  SELECT user_id FROM checkins WHERE date=? "
+            "  UNION "
+            "  SELECT user_id FROM pomodoros WHERE date=?"
+            ");",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, today.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 2, today.c_str(), -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+            result["active_today"] = sqlite3_column_int(stmt, 0);
+        sqlite3_finalize(stmt);
+    }
+
+    sqlite3_close(db);
+    return result.dump();
 }

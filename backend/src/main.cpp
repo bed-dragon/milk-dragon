@@ -10,6 +10,7 @@
 #include "routes_checkin.h"
 #include "routes_pomodoro.h"
 #include "routes_social.h"
+#include "routes_admin.h"
 
 using namespace httplib;
 using json = nlohmann::json;
@@ -36,8 +37,11 @@ int main() {
         return Server::HandlerResponse::Unhandled;
     });
 
-    // 4. 提供前端静态文件（html/css/js），一个端口搞定全部
+    // 4. 提供前端静态文件，关闭缓存确保实时生效
     svr.set_mount_point("/", "../frontend");
+    svr.set_post_routing_handler([](const Request& req, Response& res) {
+        res.set_header("Cache-Control", "no-cache, no-store, must-revalidate");
+    });
 
     // 5. 注册 API 路由
     svr.Get("/api/hello", [](const Request& req, Response& res) {
@@ -51,6 +55,11 @@ int main() {
     svr.Put(R"(/api/tasks/(\d+))",     handle_update_task);
     svr.Delete(R"(/api/tasks/(\d+))",  handle_delete_task);
 
+    // ---------------- 收藏任务模板 ----------------
+    svr.Post("/api/favorite_tasks",                    handle_favorite_task_add);
+    svr.Get("/api/favorite_tasks",                     handle_favorite_task_list);
+    svr.Delete(R"(/api/favorite_tasks/(\d+))",         handle_favorite_task_delete);
+
     // 辅助：从请求中获取 user_id（优先从 Authorization Bearer token 解析）
     auto get_uid = [](const Request& req) -> int {
         if (req.has_header("Authorization")) {
@@ -59,9 +68,7 @@ int main() {
                 return user_id_by_token(auth.substr(7));
             }
         }
-        // 兼容旧方式：query param ?user_id=
-        if (req.has_param("user_id")) return stoi(req.get_param_value("user_id"));
-        return 1;  // 默认用户 ID（正式上线后改为 -1 强制登录）
+        return -1;  // 未认证
     };
 
     // 辅助宏：检查登录状态，未登录返回 401
@@ -144,6 +151,8 @@ int main() {
     svr.Post("/api/auth/register",  handle_register);
     svr.Post("/api/auth/login",     handle_login);
     svr.Get("/api/me",              handle_get_me);
+    svr.Put("/api/me",              handle_update_profile);
+    svr.Put("/api/me/password",     handle_change_password);
     svr.Get("/api/users/search",    handle_search_users);
 
     // ---------------- 好友与社交 ----------------
@@ -171,6 +180,16 @@ int main() {
         json resp = {{"ok", true}, {"data", json::parse(data_str)}};
         res.set_content(resp.dump(), "application/json");
     });
+
+    // ---------------- 管理员接口 ----------------
+    svr.Get("/api/admin/users",                    handle_admin_users);
+    svr.Put(R"(/api/admin/users/(\d+)/role)",      handle_admin_user_role);
+    svr.Delete(R"(/api/admin/users/(\d+))",        handle_admin_user_delete);
+    svr.Get("/api/admin/recommended",               handle_admin_recommended);
+    svr.Post("/api/admin/recommended",              handle_admin_recommended_add);
+    svr.Put(R"(/api/admin/recommended/(\d+))",     handle_admin_recommended_update);
+    svr.Delete(R"(/api/admin/recommended/(\d+))",  handle_admin_recommended_delete);
+    svr.Get("/api/admin/stats",                     handle_admin_stats);
 
     // 5. 设置前端静态文件目录
     svr.set_mount_point("/", "../frontend");

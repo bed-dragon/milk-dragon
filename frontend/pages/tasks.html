@@ -8,53 +8,7 @@
 </head>
 <body>
   <!-- 侧边栏 -->
-  <aside class="sidebar">
-    <div class="sidebar-brand">
-      <span class="brand-icon">📚</span>
-      <span>学习养成计划</span>
-    </div>
-    <nav class="sidebar-nav">
-      <a class="nav-item" href="../index.html">
-        <span class="nav-icon">📊</span>
-        <span class="nav-label">仪表盘</span>
-      </a>
-      <a class="nav-item active" href="tasks.html">
-        <span class="nav-icon">📋</span>
-        <span class="nav-label">任务管理</span>
-      </a>
-      <a class="nav-item" href="checkin.html">
-        <span class="nav-icon">✅</span>
-        <span class="nav-label">打卡</span>
-      </a>
-      <a class="nav-item" href="stats.html">
-        <span class="nav-icon">📈</span>
-        <span class="nav-label">数据分析</span>
-      </a>
-      <a class="nav-item" href="reminders.html">
-        <span class="nav-icon">🔔</span>
-        <span class="nav-label">提醒中心</span>
-      </a>
-      <a class="nav-item" href="pomodoro.html">
-        <span class="nav-icon">🍅</span>
-        <span class="nav-label">番茄钟</span>
-      </a>
-      <a class="nav-item" href="profile.html">
-        <span class="nav-icon">🧑</span>
-        <span class="nav-label">个人中心</span>
-      </a>
-      <a class="nav-item" href="friends.html">
-        <span class="nav-icon">🤝</span>
-        <span class="nav-label">好友</span>
-      </a>
-      <a class="nav-item" href="materials.html">
-        <span class="nav-icon">📚</span>
-        <span class="nav-label">学习资料</span>
-      </a>
-    </nav>
-    <div class="sidebar-user" id="sidebarUserArea">
-      <span class="sidebar-user-name">未登录</span>
-    </div>
-  </aside>
+  <aside class="sidebar"></aside>
 
   <!-- 主区域 -->
   <div class="main-wrapper">
@@ -121,17 +75,32 @@
                 <th>优先级</th>
                 <th>复习</th>
                 <th>状态</th>
+                <th>收藏</th>
                 <th>操作</th>
               </tr>
             </thead>
             <tbody id="taskList">
               <tr>
-                <td colspan="7" style="text-align:center;color:var(--text-muted);">
+                <td colspan="8" style="text-align:center;color:var(--text-muted);">
                   暂无任务
                 </td>
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- 收藏任务 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">⭐ 收藏任务</h2>
+          <button class="btn btn-outline btn-sm" onclick="loadFavorites()">刷新</button>
+        </div>
+        <div id="favoriteList">
+          <div class="empty-state">
+            <div class="empty-icon">💡</div>
+            <p>还没有收藏任务，点击任务列表的 ☆ 按钮收藏吧</p>
+          </div>
         </div>
       </div>
 
@@ -157,7 +126,7 @@
   <script src="../js/navigation.js"></script>
   <script>
     Auth.guard();
-    Auth.renderSidebarUser();
+    Auth.renderSidebar('tasks');
     let editingId = null;
 
     document.getElementById('currentDate').textContent = today();
@@ -178,7 +147,7 @@
       window._tasks = tasks;
       const tbody = document.getElementById('taskList');
       if (!tasks.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">暂无任务</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);">暂无任务</td></tr>';
         return;
       }
       tbody.innerHTML = tasks.map(t => `
@@ -192,6 +161,9 @@
           <td>
             <button class="btn btn-sm btn-outline" onclick="editTask(${t.id})">编辑</button>
             <button class="btn btn-sm btn-danger" onclick="deleteTask(${t.id})">删除</button>
+          </td>
+          <td style="text-align:center;">
+            <button class="btn btn-sm" style="color:var(--warning);" onclick="favoriteTask(${t.id})" title="收藏">☆</button>
           </td>
         </tr>
       `).join('');
@@ -327,9 +299,74 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
+    // 收藏任务
+    async function favoriteTask(id) {
+      const task = (window._tasks || []).find(t => t.id === id);
+      if (!task) return;
+      try {
+        await favoriteTaskAdd({
+          title: task.title,
+          topic: task.topic || '',
+          deadline: task.deadline || '',
+          priority: task.priority || 1,
+          need_review: task.need_review || 0
+        });
+        showToast('已收藏 ☆', 'success');
+      } catch (e) {
+        showToast('收藏失败: ' + (e.message || '网络错误'), 'error');
+      }
+    }
+
+    async function loadFavorites() {
+      try {
+        const data = await getFavoriteTasks();
+        renderFavorites(data.tasks || []);
+      } catch (e) {
+        renderFavorites(MOCK.favorites || []);
+      }
+    }
+
+    function renderFavorites(tasks) {
+      const el = document.getElementById('favoriteList');
+      if (!tasks.length) {
+        el.innerHTML = '<div class="empty-state"><p>还没有收藏任务，点击任务列表的 ☆ 按钮收藏吧</p></div>';
+        return;
+      }
+      el.innerHTML = tasks.map(t => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+          <div>
+            <strong>${t.title}</strong>
+            ${t.topic ? `<span class="tag tag-review" style="margin-left:8px;">${t.topic}</span>` : ''}
+          </div>
+          <div style="display:flex;gap:4px;">
+            <button class="btn btn-sm btn-primary" onclick="quickAdd('${t.title}', '${t.topic || ''}', ${t.priority})">+ 添加</button>
+            <button class="btn btn-sm btn-danger" onclick="removeFavorite(${t.id})">删除</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function quickAdd(title, topic, priority) {
+      document.getElementById('taskTitle').value = title;
+      document.getElementById('taskTopic').value = topic;
+      document.getElementById('taskPriority').value = priority;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function removeFavorite(id) {
+      try {
+        await _deleteFavorite(id);
+        showToast('已取消收藏', 'success');
+        loadFavorites();
+      } catch (e) {
+        showToast('取消收藏失败', 'error');
+      }
+    }
+
     // 初始化
     loadTasks();
     loadRecommended();
+    loadFavorites();
   </script>
 </body>
 </html>

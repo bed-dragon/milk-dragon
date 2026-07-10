@@ -11,8 +11,7 @@ static int get_uid(const Request& req) {
         if (auth.rfind("Bearer ", 0) == 0)
             return user_id_by_token(auth.substr(7));
     }
-    auto uid = req.get_param_value("user_id");
-    return uid.empty() ? -1 : stoi(uid);
+    return -1;  // 未认证
 }
 
 #define REQUIRE_AUTH(uid_var) \
@@ -99,6 +98,11 @@ void handle_send_message(const Request& req, Response& res) { try {
     if (to_id <= 0 || content.empty()) {
         res.status = 400;
         res.set_content(R"({"ok":false,"error":"缺少 to_id 或 content"})", "application/json");
+        return;
+    }
+    if (content.length() > 3000) {
+        res.status = 400;
+        res.set_content(R"({"ok":false,"error":"消息内容过长（最多3000字）"})", "application/json");
         return;
     }
     if (message_send(user_id, to_id, content))

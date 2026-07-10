@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学习养成计划 — 用户管理</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <!-- 侧边栏 -->
+  <aside class="sidebar"></aside>
+
+  <!-- 主区域 -->
+  <div class="main-wrapper">
+    <header class="topbar">
+      <h1 class="topbar-title">👥 用户管理</h1>
+      <div class="topbar-right">
+        <span class="topbar-date" id="currentDate"></span>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">用户列表</h2>
+          <button class="btn btn-outline btn-sm" onclick="loadUsers()">🔄 刷新</button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>用户名</th>
+                <th>昵称</th>
+                <th>角色</th>
+                <th>注册时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="userTableBody">
+              <tr><td colspan="6" style="text-align:center;color:var(--text-muted);">加载中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/auth.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/api.js"></script>
+  <script>
+    Auth.guardAdmin();
+    Auth.renderSidebar('admin-users');
+    document.getElementById('currentDate').textContent = today();
+
+    async function loadUsers() {
+      const tbody = document.getElementById('userTableBody');
+      try {
+        const users = await getAdminUsers();
+        if (!users.length) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">暂无用户</td></tr>';
+          return;
+        }
+        const me = Auth.getUser();
+        tbody.innerHTML = users.map(u => {
+          const isMe = me && me.id === u.id;
+          const roleBadge = u.role === 'admin'
+            ? '<span class="tag" style="background:#fef3c7;color:#92400e;">管理员</span>'
+            : '<span class="tag" style="background:#e0e7ff;color:#3730a3;">用户</span>';
+          const toggleBtn = u.role === 'admin'
+            ? '<button class="btn btn-sm btn-outline" onclick="changeRole(' + u.id + ', \'user\', this)" ' + (isMe ? 'disabled' : '') + '>降为用户</button>'
+            : '<button class="btn btn-sm btn-primary" onclick="changeRole(' + u.id + ', \'admin\', this)">升为管理</button>';
+          const delBtn = isMe
+            ? '<span style="color:var(--text-muted);font-size:var(--font-size-sm);">当前账号</span>'
+            : '<button class="btn btn-sm btn-danger" onclick="removeUser(' + u.id + ', this)">删除</button>';
+          return '<tr>'
+            + '<td>' + u.id + '</td>'
+            + '<td><strong>' + u.username + '</strong>' + (isMe ? ' <span style="color:var(--text-muted);font-size:var(--font-size-xs);">(我)</span>' : '') + '</td>'
+            + '<td>' + (u.nickname || '-') + '</td>'
+            + '<td>' + roleBadge + '</td>'
+            + '<td>' + (u.created_at || '-') + '</td>'
+            + '<td style="display:flex;gap:8px;">' + toggleBtn + delBtn + '</td>'
+            + '</tr>';
+        }).join('');
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--danger);">加载失败：' + e.message + '</td></tr>';
+      }
+    }
+
+    async function changeRole(userId, role, btn) {
+      btn.disabled = true;
+      btn.textContent = '处理中...';
+      try {
+        const result = await updateUserRole(userId, role);
+        if (result.ok) {
+          showToast('角色已更新', 'success');
+          loadUsers();
+        } else {
+          showToast(result.error || '操作失败', 'error');
+          btn.disabled = false;
+        }
+      } catch (e) {
+        showToast('操作失败：' + e.message, 'error');
+        btn.disabled = false;
+      }
+    }
+
+    async function removeUser(userId, btn) {
+      const confirmed = await showConfirm('确定要删除该用户吗？其所有数据将被清空，不可恢复！');
+      if (!confirmed) return;
+      btn.disabled = true;
+      btn.textContent = '删除中...';
+      try {
+        const result = await deleteUser(userId);
+        if (result.ok) {
+          showToast('用户已删除', 'success');
+          loadUsers();
+        } else {
+          showToast(result.error || '删除失败', 'error');
+          btn.disabled = false;
+          btn.textContent = '删除';
+        }
+      } catch (e) {
+        showToast('删除失败：' + e.message, 'error');
+        btn.disabled = false;
+        btn.textContent = '删除';
+      }
+    }
+
+    loadUsers();
+  </script>
+</body>
+</html>
