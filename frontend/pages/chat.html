@@ -108,11 +108,13 @@
                 <div class="friend-name">${name}</div>
               </div>
             </div>
-            ${uc > 0 ? `<span style="background:var(--danger);color:#fff;font-size:11px;min-width:18px;height:18px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;">${uc}</span>` : ''}
+            ${uc > 0 ? `<span class="frd-unread" style="background:var(--danger);color:#fff;font-size:11px;min-width:18px;height:18px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;">${uc}</span>` : ''}
           </div>
         `}).join('');
 
-        if (presetFriendId) {
+        // 仅在首次加载时自动选中URL预设好友，之后刷新不再跳转
+        if (presetFriendId && !window._presetDone) {
+          window._presetDone = true;
           selectFriend(parseInt(presetFriendId), decodeURIComponent(presetFriendName));
         }
       } catch (e) {
@@ -133,15 +135,70 @@
       // 显示聊天区
       document.getElementById('chatPlaceholder').style.display = 'none';
       document.getElementById('chatArea').style.display = 'flex';
-      // 保留未读计数
-      const oldBadge = document.getElementById('chatTitle').querySelector('span');
-      const badgeHtml = oldBadge ? ' ' + oldBadge.outerHTML : '';
-      document.getElementById('chatTitle').innerHTML = '💬 ' + friendName + badgeHtml;
+
+      // 立即清除该好友的未读徽章（后端已经在 message_history 查询时标记已读）
+      clearFriendBadge(friendId);
+      // 标题显示好友名（不带旧徽章），后续 refreshUnreadOnly 会更新全局徽章
+      document.getElementById('chatTitle').innerHTML = '💬 ' + friendName;
+      // 高亮当前好友
+      document.querySelectorAll('#chatFriendList .friend-item').forEach(el => {
+        el.classList.toggle('active', parseInt(el.dataset.fid) === friendId);
+      });
 
       refreshMessages();
-      // 每3秒自动刷新消息
       if (window._chatTimer) clearInterval(window._chatTimer);
-      window._chatTimer = setInterval(refreshMessages, 3000);
+      // 立即刷新一次未读数
+      refreshUnreadOnly();
+      window._chatTimer = setInterval(() => {
+        refreshMessages();
+        refreshUnreadOnly();
+      }, 3000);
+    }
+
+    // 清除某个好友的未读徽章
+    function clearFriendBadge(fid) {
+      document.querySelectorAll('#chatFriendList .friend-item').forEach(el => {
+        if (parseInt(el.dataset.fid) === fid) {
+          const b = el.querySelector('.frd-unread');
+          if (b) b.remove();
+        }
+      });
+    }
+
+    // 轻量刷新好友未读徽章（不重建DOM）
+    async function refreshUnreadOnly() {
+      try {
+        const unreadMap = {};
+        let totalUnread = 0;
+        const items = document.querySelectorAll('#chatFriendList .friend-item');
+        const fids = Array.from(items).map(el => parseInt(el.dataset.fid)).filter(Boolean);
+        await Promise.all(fids.map(async fid => {
+          try { const c = await getUnreadCount(fid); if (c > 0) { unreadMap[fid] = c; totalUnread += c; } } catch(e) {}
+        }));
+        // 更新标题徽章
+        const badge = totalUnread > 0 ? ` <span style="background:var(--danger);color:#fff;font-size:11px;padding:1px 6px;border-radius:10px;margin-left:4px;">${totalUnread}</span>` : '';
+        if (activeFriendId) {
+          const name = activeFriendName || '';
+          document.getElementById('chatTitle').innerHTML = '💬 ' + name + badge;
+        } else {
+          document.getElementById('chatTitle').innerHTML = '💬 聊天' + badge;
+        }
+        // 更新每个好友的徽章
+        items.forEach(el => {
+          const fid = parseInt(el.dataset.fid);
+          const uc = unreadMap[fid] || 0;
+          const existing = el.querySelector('.frd-unread');
+          if (existing) existing.remove();
+          if (uc > 0) {
+            const badgeEl = document.createElement('span');
+            badgeEl.className = 'frd-unread';
+            badgeEl.style.cssText = 'background:var(--danger);color:#fff;font-size:11px;min-width:18px;height:18px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;margin-left:6px;';
+            badgeEl.textContent = uc;
+            const nameDiv = el.querySelector('.friend-name');
+            if (nameDiv) nameDiv.appendChild(badgeEl);
+          }
+        });
+      } catch(e) {}
     }
 
     // 刷新消息
@@ -186,7 +243,10 @@
         if (result.ok) {
           document.getElementById('msgInput').value = '';
           refreshMessages();
-          loadChatFriends();  // 刷新列表清除对面新来的未读（发送不产生自己的未读）
+          // 更新好友列表中自己的高亮状态（无额外API开销）
+          document.querySelectorAll('#chatFriendList .friend-item').forEach(el => {
+            el.classList.toggle('active', parseInt(el.dataset.fid) === activeFriendId);
+          });
         } else {
           showToast(result.error || '发送失败', 'error');
         }
