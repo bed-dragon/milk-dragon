@@ -85,6 +85,23 @@ async function getRecommended() {
 }
 
 // ═══════════════════════════════════
+// 收藏任务 API
+// ═══════════════════════════════════
+
+function favoriteTaskAdd(task) {
+  return request('POST', '/api/favorite_tasks', task);
+}
+
+async function getFavoriteTasks() {
+  const data = await request('GET', '/api/favorite_tasks');
+  return { tasks: data.data || [] };
+}
+
+function _deleteFavorite(id) {
+  return request('DELETE', `/api/favorite_tasks/${id}`);
+}
+
+// ═══════════════════════════════════
 // 打卡 API
 // ═══════════════════════════════════
 
@@ -358,6 +375,12 @@ const MOCK = {
     { id: 106, title: '练习听力 20 分钟', topic: '英语', priority: 2 },
     { id: 107, title: '写学习日记', topic: '学习方法', priority: 3 },
     { id: 108, title: '运动 30 分钟', topic: '健康', priority: 3 },
+  ],
+
+  // ── 收藏任务 ──
+  favorites: [
+    { id: 1, title: '背 30 个英语单词', topic: '英语', priority: 2 },
+    { id: 2, title: '完成 LeetCode 每日一题', topic: '编程', priority: 2 },
   ],
 
   // ── 打卡 ──

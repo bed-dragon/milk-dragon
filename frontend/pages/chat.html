@@ -117,6 +117,9 @@
       document.getElementById('chatTitle').textContent = '💬 ' + friendName;
 
       refreshMessages();
+      // 每3秒自动刷新消息
+      if (window._chatTimer) clearInterval(window._chatTimer);
+      window._chatTimer = setInterval(refreshMessages, 3000);
     }
 
     // 刷新消息

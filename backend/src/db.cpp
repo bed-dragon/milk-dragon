@@ -61,7 +61,7 @@ void init_tables() {
             signature     TEXT    DEFAULT '',
             token         TEXT    DEFAULT '',
             role          TEXT    DEFAULT 'user',
-            created_at    TEXT    DEFAULT (datetime('now'))
+            created_at    TEXT    DEFAULT (datetime('now','localtime'))
         );
     )");
 
@@ -79,7 +79,7 @@ void init_tables() {
             priority    INTEGER DEFAULT 1,
             status      INTEGER DEFAULT 0,
             need_review INTEGER DEFAULT 0,
-            created_at  TEXT    DEFAULT (datetime('now')),
+            created_at  TEXT    DEFAULT (datetime('now','localtime')),
             FOREIGN KEY (user_id) REFERENCES users(id)
         );
     )");
@@ -91,7 +91,7 @@ void init_tables() {
             user_id    INTEGER NOT NULL,
             task_id    INTEGER NOT NULL,
             date       TEXT    NOT NULL,
-            created_at TEXT    DEFAULT (datetime('now')),
+            created_at TEXT    DEFAULT (datetime('now','localtime')),
             FOREIGN KEY (user_id) REFERENCES users(id),
             FOREIGN KEY (task_id) REFERENCES tasks(id),
             UNIQUE(task_id, date)
@@ -104,7 +104,7 @@ void init_tables() {
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id    INTEGER NOT NULL,
             date       TEXT    NOT NULL,
-            created_at TEXT    DEFAULT (datetime('now')),
+            created_at TEXT    DEFAULT (datetime('now','localtime')),
             FOREIGN KEY (user_id) REFERENCES users(id),
             UNIQUE(user_id, date)
         );
@@ -119,7 +119,7 @@ void init_tables() {
             type       TEXT    NOT NULL DEFAULT 'due',
             message    TEXT    NOT NULL,
             is_read    INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT    DEFAULT (datetime('now')),
+            created_at TEXT    DEFAULT (datetime('now','localtime')),
             FOREIGN KEY (user_id) REFERENCES users(id),
             FOREIGN KEY (task_id) REFERENCES tasks(id)
         );
@@ -132,7 +132,7 @@ void init_tables() {
             from_id    INTEGER NOT NULL,
             to_id      INTEGER NOT NULL,
             status     INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT    DEFAULT (datetime('now')),
+            created_at TEXT    DEFAULT (datetime('now','localtime')),
             FOREIGN KEY (from_id) REFERENCES users(id),
             FOREIGN KEY (to_id) REFERENCES users(id)
         );
@@ -146,7 +146,7 @@ void init_tables() {
             to_id      INTEGER NOT NULL,
             content    TEXT    NOT NULL,
             is_read    INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT    DEFAULT (datetime('now')),
+            created_at TEXT    DEFAULT (datetime('now','localtime')),
             FOREIGN KEY (from_id) REFERENCES users(id),
             FOREIGN KEY (to_id) REFERENCES users(id)
         );
@@ -159,7 +159,7 @@ void init_tables() {
             user_id    INTEGER NOT NULL,
             title      TEXT    NOT NULL,
             url        TEXT    NOT NULL,
-            created_at TEXT    DEFAULT (datetime('now')),
+            created_at TEXT    DEFAULT (datetime('now','localtime')),
             FOREIGN KEY (user_id) REFERENCES users(id)
         );
     )");
@@ -171,7 +171,7 @@ void init_tables() {
             user_id    INTEGER NOT NULL,
             duration   INTEGER NOT NULL,
             date       TEXT    NOT NULL,
-            created_at TEXT    DEFAULT (datetime('now')),
+            created_at TEXT    DEFAULT (datetime('now','localtime')),
             FOREIGN KEY (user_id) REFERENCES users(id)
         );
     )");
@@ -182,7 +182,7 @@ void init_tables() {
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
             content    TEXT    NOT NULL,
             author     TEXT    DEFAULT '佚名',
-            created_at TEXT    DEFAULT (datetime('now'))
+            created_at TEXT    DEFAULT (datetime('now','localtime'))
         );
     )");
 
@@ -207,7 +207,7 @@ void init_tables() {
             title      TEXT    NOT NULL,
             topic      TEXT    DEFAULT '',
             priority   INTEGER DEFAULT 1,
-            created_at TEXT    DEFAULT (datetime('now'))
+            created_at TEXT    DEFAULT (datetime('now','localtime'))
         );
     )");
 
@@ -219,6 +219,21 @@ void init_tables() {
     exec_sql(db, "INSERT OR IGNORE INTO recommended_tasks(id,title,topic,priority) VALUES(6,'练习听力20分钟','英语',2);");
     exec_sql(db, "INSERT OR IGNORE INTO recommended_tasks(id,title,topic,priority) VALUES(7,'写学习日记','学习方法',3);");
     exec_sql(db, "INSERT OR IGNORE INTO recommended_tasks(id,title,topic,priority) VALUES(8,'运动30分钟','健康',3);");
+
+    // 13. 收藏任务表（任务模板快速复用）
+    exec_sql(db, R"(
+        CREATE TABLE IF NOT EXISTS favorite_tasks (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    INTEGER NOT NULL,
+            title      TEXT    NOT NULL,
+            topic      TEXT    DEFAULT '',
+            deadline   TEXT    DEFAULT '',
+            priority   INTEGER DEFAULT 1,
+            need_review INTEGER DEFAULT 0,
+            created_at TEXT    DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+    )");
 
     sqlite3_close(db);
     cout << "[OK] Database initialized, all tables ready" << endl;
@@ -257,17 +272,18 @@ void init_tables() {
 // ============================================================
 
 // 注册：密码 SHA256 哈希后存入，返回新用户 id，重名返回 -1
-int user_create(const string& username, const string& password) {
+int user_create(const string& username, const string& password, const string& nickname) {
     sqlite3* db = open_db();
     if (!db) return -1;
 
     string hash = sha256(password);
 
-    const char* sql = "INSERT INTO users (username, password_hash) VALUES (?, ?)";
+    const char* sql = "INSERT INTO users (username, password_hash, nickname) VALUES (?, ?, ?)";
     sqlite3_stmt* stmt = nullptr;
     sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
     sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 2, hash.c_str(),     -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, nickname.c_str(), -1, SQLITE_TRANSIENT);
 
     int ok = sqlite3_step(stmt);
     int new_id = (ok == SQLITE_DONE) ? (int)sqlite3_last_insert_rowid(db) : -1;
@@ -302,6 +318,15 @@ static string today_str() {
     struct tm* tm = localtime(&t);
     char buf[11];
     strftime(buf, sizeof(buf), "%Y-%m-%d", tm);
+    return string(buf);
+}
+
+// 当前日期时间 "YYYY-MM-DD HH:MM:SS"（北京时间）
+static string now_local() {
+    time_t t = time(nullptr);
+    struct tm* tm = localtime(&t);
+    char buf[20];
+    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", tm);
     return string(buf);
 }
 
@@ -428,6 +453,53 @@ string user_search(const string& keyword) {
     return result;
 }
 
+// 更新个人资料（昵称 + 签名）
+bool user_update_profile(int user_id, const string& nickname, const string& signature) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+    const char* sql = "UPDATE users SET nickname=?, signature=? WHERE id=?";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    sqlite3_bind_text(stmt, 1, nickname.c_str(),  -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, signature.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt,  3, user_id);
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return ok;
+}
+
+// 修改密码：先验证旧密码，再更新
+bool user_change_password(int user_id, const string& old_pwd, const string& new_pwd) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    // 验证旧密码
+    string old_hash = sha256(old_pwd);
+    const char* check = "SELECT id FROM users WHERE id=? AND password_hash=?";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, check, -1, &stmt, 0);
+    sqlite3_bind_int(stmt, 1, user_id);
+    sqlite3_bind_text(stmt, 2, old_hash.c_str(), -1, SQLITE_TRANSIENT);
+    if (sqlite3_step(stmt) != SQLITE_ROW) {
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
+        return false;  // 旧密码不对
+    }
+    sqlite3_finalize(stmt);
+
+    // 更新为新密码
+    string new_hash = sha256(new_pwd);
+    const char* upd = "UPDATE users SET password_hash=?, token='' WHERE id=?";
+    sqlite3_prepare_v2(db, upd, -1, &stmt, 0);
+    sqlite3_bind_text(stmt, 1, new_hash.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 2, user_id);
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return ok;
+}
+
 // ============================================================
 // 任务模块（使用 Task struct 传参）
 // ============================================================
@@ -438,8 +510,8 @@ int task_create(int user_id, const Task& t) {
 
     sqlite3_stmt* stmt = nullptr;
     const char* sql = R"(
-        INSERT INTO tasks (user_id, title, topic, deadline, priority, need_review)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO tasks (user_id, title, topic, deadline, priority, need_review, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     )";
 
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, 0) != SQLITE_OK) {
@@ -448,12 +520,14 @@ int task_create(int user_id, const Task& t) {
         return -1;
     }
 
+    string now = now_local();
     sqlite3_bind_int(stmt,  1, user_id);
     sqlite3_bind_text(stmt, 2, t.title.c_str(),    -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 3, t.topic.c_str(),    -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 4, t.deadline.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_int(stmt,  5, t.priority);
     sqlite3_bind_int(stmt,  6, t.need_review ? 1 : 0);
+    sqlite3_bind_text(stmt, 7, now.c_str(), -1, SQLITE_TRANSIENT);
 
     int ok = sqlite3_step(stmt);
     if (ok != SQLITE_DONE) {
@@ -652,12 +726,14 @@ bool checkin_do(int user_id, int task_id, const string& date) {
     if (!db) return false;
 
     sqlite3_stmt* stmt = nullptr;
-    const char* sql = "INSERT INTO checkins (user_id, task_id, date) VALUES (?, ?, ?);";
+    const char* sql = "INSERT INTO checkins (user_id, task_id, date, created_at) VALUES (?, ?, ?, ?);";
     bool ok = false;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        string now = now_local();
         sqlite3_bind_int(stmt, 1, user_id);
         sqlite3_bind_int(stmt, 2, task_id);
         sqlite3_bind_text(stmt, 3, date.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 4, now.c_str(), -1, SQLITE_TRANSIENT);
         ok = (sqlite3_step(stmt) == SQLITE_DONE);
         if (!ok) cerr << "[WARN] checkin_do: 可能重复打卡 " << sqlite3_errmsg(db) << endl;
         sqlite3_finalize(stmt);
@@ -726,11 +802,13 @@ bool signin_do(int user_id, const string& date) {
     if (!db) return false;
 
     sqlite3_stmt* stmt = nullptr;
-    const char* sql = "INSERT INTO signins (user_id, date) VALUES (?, ?);";
+    const char* sql = "INSERT INTO signins (user_id, date, created_at) VALUES (?, ?, ?);";
     bool ok = false;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        string now = now_local();
         sqlite3_bind_int(stmt, 1, user_id);
         sqlite3_bind_text(stmt, 2, date.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 3, now.c_str(), -1, SQLITE_TRANSIENT);
         ok = (sqlite3_step(stmt) == SQLITE_DONE);
         if (!ok) cerr << "[WARN] signin_do: 可能重复签到 " << sqlite3_errmsg(db) << endl;
         sqlite3_finalize(stmt);
@@ -904,6 +982,8 @@ string reminder_list(int user_id, const string& type) {
             while (sqlite3_step(stmt) == SQLITE_ROW) {
                 int tid = sqlite3_column_int(stmt, 0);
                 string dl = (const char*)sqlite3_column_text(stmt, 2);
+                // 截断 datetime-local 格式中的时间部分，只保留日期
+                if (dl.length() > 10) dl = dl.substr(0, 10);
                 string urg = "low";
                 if (dl <= today) urg = "high";
                 else if (dl == date_offset_str(1)) urg = "medium";
@@ -1069,11 +1149,13 @@ bool friend_request(int from_id, int to_id) {
 
     sqlite3_stmt* stmt = nullptr;
     const char* sql =
-        "INSERT INTO friendships (from_id, to_id, status) VALUES (?, ?, 0);";
+        "INSERT INTO friendships (from_id, to_id, status, created_at) VALUES (?, ?, 0, ?);";
     bool ok = false;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        string now = now_local();
         sqlite3_bind_int(stmt, 1, from_id);
         sqlite3_bind_int(stmt, 2, to_id);
+        sqlite3_bind_text(stmt, 3, now.c_str(), -1, SQLITE_TRANSIENT);
         ok = (sqlite3_step(stmt) == SQLITE_DONE);
         sqlite3_finalize(stmt);
     }
@@ -1191,12 +1273,14 @@ bool message_send(int from_id, int to_id, const string& content) {
     if (!db) return false;
 
     sqlite3_stmt* stmt = nullptr;
-    const char* sql = "INSERT INTO messages (from_id, to_id, content, is_read) VALUES (?, ?, ?, 0);";
+    const char* sql = "INSERT INTO messages (from_id, to_id, content, is_read, created_at) VALUES (?, ?, ?, 0, ?);";
     bool ok = false;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        string now = now_local();
         sqlite3_bind_int(stmt, 1, from_id);
         sqlite3_bind_int(stmt, 2, to_id);
         sqlite3_bind_text(stmt, 3, content.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 4, now.c_str(), -1, SQLITE_TRANSIENT);
         ok = (sqlite3_step(stmt) == SQLITE_DONE);
         sqlite3_finalize(stmt);
     }
@@ -1293,12 +1377,14 @@ string material_list(int user_id) {
 bool material_add(int user_id, const string& title, const string& url) {
     sqlite3* db = open_db();
     if (!db) return false;
-    const char* sql = "INSERT INTO materials (user_id, title, url) VALUES (?, ?, ?)";
+    const char* sql = "INSERT INTO materials (user_id, title, url, created_at) VALUES (?, ?, ?, ?)";
     sqlite3_stmt* stmt = nullptr;
     sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    string now = now_local();
     sqlite3_bind_int(stmt,  1, user_id);
     sqlite3_bind_text(stmt, 2, title.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 3, url.c_str(),   -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 4, now.c_str(), -1, SQLITE_TRANSIENT);
     bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
     sqlite3_finalize(stmt);
     sqlite3_close(db);
@@ -1318,6 +1404,75 @@ bool material_delete(int material_id, int user_id) {
     sqlite3_close(db);
     return ok;
 }
+
+// ============================================================
+// 收藏任务（任务模板快速复用）
+// ============================================================
+
+bool favorite_task_add(int user_id, const Task& t) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    const char* sql = R"(
+        INSERT INTO favorite_tasks (user_id, title, topic, deadline, priority, need_review)
+        VALUES (?, ?, ?, ?, ?, ?)
+    )";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    sqlite3_bind_int(stmt,  1, user_id);
+    sqlite3_bind_text(stmt, 2, t.title.c_str(),    -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, t.topic.c_str(),    -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 4, t.deadline.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt,  5, t.priority);
+    sqlite3_bind_int(stmt,  6, t.need_review ? 1 : 0);
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return ok;
+}
+
+string favorite_task_list(int user_id) {
+    sqlite3* db = open_db();
+    if (!db) return "[]";
+
+    const char* sql = R"(
+        SELECT id, title, topic, priority, need_review
+        FROM favorite_tasks WHERE user_id=? ORDER BY created_at DESC
+    )";
+    sqlite3_stmt* stmt = nullptr;
+    json arr = json::array();
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, user_id);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            json f;
+            f["id"]          = sqlite3_column_int(stmt, 0);
+            f["title"]       = (const char*)sqlite3_column_text(stmt, 1);
+            f["topic"]       = (const char*)sqlite3_column_text(stmt, 2);
+            f["priority"]    = sqlite3_column_int(stmt, 3);
+            f["need_review"] = sqlite3_column_int(stmt, 4);
+            arr.push_back(f);
+        }
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return arr.dump();
+}
+
+bool favorite_task_delete(int favorite_id, int user_id) {
+    sqlite3* db = open_db();
+    if (!db) return false;
+
+    const char* sql = "DELETE FROM favorite_tasks WHERE id=? AND user_id=?";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    sqlite3_bind_int(stmt, 1, favorite_id);
+    sqlite3_bind_int(stmt, 2, user_id);
+    bool ok = sqlite3_step(stmt) == SQLITE_DONE && sqlite3_changes(db) > 0;
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return ok;
+}
+
 // 番茄钟
 bool pomodoro_record(int user_id, int duration) {
     sqlite3* db = open_db();
@@ -1326,12 +1481,14 @@ bool pomodoro_record(int user_id, int duration) {
     string today = today_str();
     sqlite3_stmt* stmt = nullptr;
     const char* sql =
-        "INSERT INTO pomodoros (user_id, duration, date) VALUES (?, ?, ?);";
+        "INSERT INTO pomodoros (user_id, duration, date, created_at) VALUES (?, ?, ?, ?);";
     bool ok = false;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        string now = now_local();
         sqlite3_bind_int(stmt, 1, user_id);
         sqlite3_bind_int(stmt, 2, duration);
         sqlite3_bind_text(stmt, 3, today.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 4, now.c_str(), -1, SQLITE_TRANSIENT);
         ok = (sqlite3_step(stmt) == SQLITE_DONE);
         sqlite3_finalize(stmt);
     }
