@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学习养成计划 — 个人中心</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <!-- 侧边栏 -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-icon">📚</span>
+      <span>学习养成计划</span>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" href="../index.html">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">仪表盘</span>
+      </a>
+      <a class="nav-item" href="tasks.html">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">任务管理</span>
+      </a>
+      <a class="nav-item" href="checkin.html">
+        <span class="nav-icon">✅</span>
+        <span class="nav-label">打卡</span>
+      </a>
+      <a class="nav-item" href="stats.html">
+        <span class="nav-icon">📈</span>
+        <span class="nav-label">数据分析</span>
+      </a>
+      <a class="nav-item" href="reminders.html">
+        <span class="nav-icon">🔔</span>
+        <span class="nav-label">提醒中心</span>
+      </a>
+      <a class="nav-item" href="pomodoro.html">
+        <span class="nav-icon">🍅</span>
+        <span class="nav-label">番茄钟</span>
+      </a>
+      <a class="nav-item active" href="profile.html">
+        <span class="nav-icon">👤</span>
+        <span class="nav-label">个人中心</span>
+      </a>
+      <a class="nav-item" href="friends.html">
+        <span class="nav-icon">👥</span>
+        <span class="nav-label">好友</span>
+      </a>
+      <a class="nav-item" href="materials.html">
+        <span class="nav-icon">📎</span>
+        <span class="nav-label">学习资料</span>
+      </a>
+    </nav>
+    <div class="sidebar-user" id="sidebarUserArea">
+      <span class="sidebar-user-name">未登录</span>
+    </div>
+  </aside>
+
+  <!-- 主区域 -->
+  <div class="main-wrapper">
+    <header class="topbar">
+      <h1 class="topbar-title">个人中心</h1>
+      <div class="topbar-right">
+        <span class="topbar-date" id="currentDate"></span>
+      </div>
+    </header>
+
+    <main class="content">
+      <!-- 个人信息展示 -->
+      <div class="card profile-card">
+        <div class="profile-header">
+          <div class="profile-avatar-large" id="profileAvatar">👤</div>
+          <div class="profile-info-text">
+            <div class="profile-name" id="profileName">加载中...</div>
+            <div class="profile-meta" id="profileMeta"></div>
+          </div>
+        </div>
+
+        <div class="profile-section">
+          <h3>📝 编辑个人资料</h3>
+          <form id="profileForm" onsubmit="handleProfileUpdate(event)">
+            <div class="form-group">
+              <label class="form-label">用户名</label>
+              <input class="form-input" type="text" id="dispUsername" disabled style="opacity:0.6;">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="editNickname">昵称</label>
+              <input class="form-input" type="text" id="editNickname" placeholder="给自己起个好听的名字">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="editSignature">个性签名</label>
+              <input class="form-input" type="text" id="editSignature" placeholder="写一句话介绍自己...">
+            </div>
+            <button type="submit" class="btn btn-primary" id="saveProfileBtn">保存修改</button>
+          </form>
+        </div>
+
+        <div class="profile-section">
+          <h3>🔒 修改密码</h3>
+          <form id="passwordForm" onsubmit="handlePasswordChange(event)">
+            <div class="form-group">
+              <label class="form-label" for="oldPassword">旧密码</label>
+              <input class="form-input" type="password" id="oldPassword" placeholder="请输入旧密码" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="newPassword">新密码</label>
+              <input class="form-input" type="password" id="newPassword" placeholder="至少 6 位" required minlength="6">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="confirmPassword">确认新密码</label>
+              <input class="form-input" type="password" id="confirmPassword" placeholder="再次输入新密码" required>
+            </div>
+            <button type="submit" class="btn btn-outline" id="changePwdBtn">修改密码</button>
+          </form>
+        </div>
+
+        <div class="profile-section">
+          <button class="btn btn-danger" onclick="Auth.logout()">🚪 退出登录</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/auth.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/api.js"></script>
+  <script>
+    Auth.guard();
+    Auth.renderSidebarUser();
+    document.getElementById('currentDate').textContent = today();
+
+    let currentUser = null;
+
+    // 加载用户信息
+    async function loadProfile() {
+      try {
+        const me = await getMe();
+        if (me.ok && me.data) {
+          currentUser = me.data;
+          renderProfile(currentUser);
+          // 同步更新 localStorage
+          Auth.set(Auth.getToken(), currentUser);
+        }
+      } catch (e) {
+        // 降级到 localStorage 数据
+        currentUser = Auth.getUser();
+        if (currentUser) renderProfile(currentUser);
+      }
+    }
+
+    function renderProfile(user) {
+      const initial = (user.nickname || user.username || '?')[0].toUpperCase();
+      document.getElementById('profileAvatar').textContent = initial;
+      document.getElementById('profileName').textContent = user.nickname || user.username || '未设置';
+      document.getElementById('profileMeta').textContent =
+        '注册时间：' + (user.created_at || '未知') + '  |  用户名：' + (user.username || '-');
+      document.getElementById('dispUsername').value = user.username || '';
+      document.getElementById('editNickname').value = user.nickname || '';
+      document.getElementById('editSignature').value = user.signature || '';
+    }
+
+    // 更新个人资料
+    async function handleProfileUpdate(e) {
+      e.preventDefault();
+      const nickname = document.getElementById('editNickname').value.trim();
+      const signature = document.getElementById('editSignature').value.trim();
+      const btn = document.getElementById('saveProfileBtn');
+      btn.disabled = true;
+      btn.textContent = '保存中...';
+
+      try {
+        const result = await updateProfile(nickname, signature);
+        if (result.ok) {
+          showToast('个人资料已更新！', 'success');
+          loadProfile();
+        } else {
+          showToast(result.msg || '更新失败', 'error');
+        }
+      } catch (err) {
+        // Mock 模式：本地更新
+        if (currentUser) {
+          currentUser.nickname = nickname;
+          currentUser.signature = signature;
+          Auth.set(Auth.getToken(), currentUser);
+          renderProfile(currentUser);
+        }
+        showToast('个人资料已更新！（模拟）', 'success');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '保存修改';
+      }
+    }
+
+    // 修改密码
+    async function handlePasswordChange(e) {
+      e.preventDefault();
+      const oldPwd = document.getElementById('oldPassword').value;
+      const newPwd = document.getElementById('newPassword').value;
+      const confirmPwd = document.getElementById('confirmPassword').value;
+
+      if (newPwd.length < 6) {
+        showToast('新密码至少 6 位', 'warning');
+        return;
+      }
+      if (newPwd !== confirmPwd) {
+        showToast('两次密码输入不一致', 'warning');
+        return;
+      }
+
+      const btn = document.getElementById('changePwdBtn');
+      btn.disabled = true;
+      btn.textContent = '修改中...';
+
+      try {
+        const result = await changePassword(oldPwd, newPwd);
+        if (result.ok) {
+          showToast('密码已修改！', 'success');
+          document.getElementById('passwordForm').reset();
+        } else {
+          showToast(result.msg || '密码修改失败', 'error');
+        }
+      } catch (err) {
+        showToast('密码已修改！（模拟）', 'success');
+        document.getElementById('passwordForm').reset();
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '修改密码';
+      }
+    }
+
+    loadProfile();
+  </script>
+</body>
+</html>
