@@ -13,8 +13,7 @@ static int get_uid(const Request& req) {
         if (auth.rfind("Bearer ", 0) == 0)
             return user_id_by_token(auth.substr(7));
     }
-    auto uid = req.get_param_value("user_id");
-    return uid.empty() ? -1 : stoi(uid);
+    return -1;  // 未认证
 }
 
 #define CATCH_ERR catch(exception& e) { \

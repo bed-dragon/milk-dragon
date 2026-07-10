@@ -16,7 +16,14 @@ void handle_register(const Request& req, Response& res) { try {
     json body = json::parse(req.body);
     string username = body["username"];
     string password = body["password"];
-    string nickname = body.value("nickname", username);  // 没传昵称就用用户名
+    string nickname = body.value("nickname", username);
+
+    if (username.length() > 90) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"用户名最多90个字符"})", "application/json"); return;
+    }
+    if (nickname.length() > 90) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"昵称最多90个字符"})", "application/json"); return;
+    }  // 没传昵称就用用户名
 
     int uid = user_create(username, password, nickname);
 
@@ -88,6 +95,10 @@ void handle_get_me(const Request& req, Response& res) { try {
 
 // GET /api/users/search?q=关键词
 void handle_search_users(const Request& req, Response& res) { try {
+    string token = req.get_header_value("Authorization");
+    if (token.rfind("Bearer ", 0) != 0) {
+        res.status = 401; res.set_content(R"({"ok":false,"error":"请先登录"})", "application/json"); return;
+    }
     string q = req.get_param_value("q");
     string data = user_search(q);
 
@@ -106,6 +117,14 @@ void handle_update_profile(const Request& req, Response& res) { try {
     json body = json::parse(req.body);
     string nickname  = body.value("nickname", "");
     string signature = body.value("signature", "");
+
+    if (nickname.length() > 90) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"昵称最多90个字符"})", "application/json"); return;
+    }
+    if (signature.length() > 100) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"签名最多100个字符"})", "application/json"); return;
+    }
+
     bool ok = user_update_profile(uid, nickname, signature);
     json resp;
     resp["ok"] = ok;

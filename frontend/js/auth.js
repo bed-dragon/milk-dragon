@@ -164,5 +164,15 @@ const Auth = {
 
     // 渲染用户区域
     this.renderSidebarUser();
+
+    // 检测番茄钟是否在其他页面完成
+    var doneMinutes = localStorage.getItem('pomodoro_done');
+    if (doneMinutes && activePage !== 'pomodoro') {
+      setTimeout(function() {
+        if (typeof showToast === 'function') {
+          showToast('🍅 番茄钟 ' + doneMinutes + ' 分钟已完成！', 'success');
+        }
+      }, 500);
+    }
   }
 };

@@ -15,9 +15,6 @@ static int get_uid_from_req(const Request& req) {
             return user_id_by_token(auth.substr(7));
         }
     }
-    // 兼容 query param
-    auto uid = req.get_param_value("user_id");
-    if (!uid.empty()) return stoi(uid);
     return -1;  // 未认证
 }
 
@@ -39,6 +36,8 @@ void handle_get_tasks(const Request& req, Response& res) { try {
 
 // GET /api/tasks/1
 void handle_get_one_task(const Request& req, Response& res) { try {
+    int user_id = get_uid_from_req(req);
+    if (user_id <= 0) { res.status = 401; res.set_content(R"({"ok":false,"error":"请先登录"})", "application/json"); return; }
     int task_id = stoi(req.matches[1]);
     string data = task_get_one(task_id);
     json resp;
@@ -55,6 +54,12 @@ void handle_create_task(const Request& req, Response& res) { try {
     Task t;
     t.title       = body["title"];
     t.topic       = body.value("topic", "");
+    if (t.title.length() > 150) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"任务标题最多150个字符"})", "application/json"); return;
+    }
+    if (t.topic.length() > 150) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"主题最多150个字符"})", "application/json"); return;
+    }
     t.deadline    = body.value("deadline", "");
     t.priority    = body.value("priority", 1);
     // 兼容前端发 0/1（整数）和 true/false（布尔）
@@ -79,6 +84,12 @@ void handle_update_task(const Request& req, Response& res) { try {
     Task t;
     t.title       = body.value("title", "");
     t.topic       = body.value("topic", "");
+    if (t.title.length() > 150) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"任务标题最多150个字符"})", "application/json"); return;
+    }
+    if (t.topic.length() > 150) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"主题最多150个字符"})", "application/json"); return;
+    }
     t.deadline    = body.value("deadline", "");
     t.priority    = body.value("priority", 1);
     // 只有前端显式传了 status 才更新，否则保留原状态（防打卡状态被覆盖）

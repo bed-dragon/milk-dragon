@@ -12,8 +12,7 @@ static int get_uid(const Request& req) {
         if (auth.rfind("Bearer ", 0) == 0)
             return user_id_by_token(auth.substr(7));
     }
-    auto uid = req.get_param_value("user_id");
-    return uid.empty() ? -1 : stoi(uid);
+    return -1;  // 未认证
 }
 
 #define CATCH_ERR catch(exception& e) { \
@@ -45,7 +44,15 @@ void handle_add_material(const Request& req, Response& res) { try {
         return;
     }
     json body = json::parse(req.body);
-    bool ok = material_add(user_id, body["title"], body["url"]);
+    string title = body["title"];
+    string url   = body["url"];
+    if (title.length() > 150) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"资料标题最多150个字符"})", "application/json"); return;
+    }
+    if (url.length() > 500) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"链接过长"})", "application/json"); return;
+    }
+    bool ok = material_add(user_id, title, url);
     json resp;
     resp["ok"] = ok;
     res.set_content(resp.dump(), "application/json");
