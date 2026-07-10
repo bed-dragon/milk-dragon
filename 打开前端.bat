@@ -1,2 +1,2 @@
 @echo off
-start http://127.0.0.1:5500/frontend/index.html
+start http://localhost:8080/index.html
