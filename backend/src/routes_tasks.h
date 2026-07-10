@@ -9,3 +9,6 @@ void handle_get_one_task(const Request& req, Response& res);
 void handle_create_task(const Request& req, Response& res);
 void handle_update_task(const Request& req, Response& res);
 void handle_delete_task(const Request& req, Response& res);
+void handle_favorite_task_add(const Request& req, Response& res);
+void handle_favorite_task_list(const Request& req, Response& res);
+void handle_favorite_task_delete(const Request& req, Response& res);

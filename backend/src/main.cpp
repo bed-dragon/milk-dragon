@@ -54,6 +54,11 @@ int main() {
     svr.Put(R"(/api/tasks/(\d+))",     handle_update_task);
     svr.Delete(R"(/api/tasks/(\d+))",  handle_delete_task);
 
+    // ---------------- 收藏任务模板 ----------------
+    svr.Post("/api/favorite_tasks",                    handle_favorite_task_add);
+    svr.Get("/api/favorite_tasks",                     handle_favorite_task_list);
+    svr.Delete(R"(/api/favorite_tasks/(\d+))",         handle_favorite_task_delete);
+
     // 辅助：从请求中获取 user_id（优先从 Authorization Bearer token 解析）
     auto get_uid = [](const Request& req) -> int {
         if (req.has_header("Authorization")) {

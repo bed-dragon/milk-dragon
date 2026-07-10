@@ -157,5 +157,10 @@ bool   material_delete(int material_id, int user_id);
 bool   pomodoro_record(int user_id, int duration);
 string pomodoro_today(int user_id);
 
+// 收藏任务（快速模板）
+bool   favorite_task_add(int user_id, const Task& t);
+string favorite_task_list(int user_id);
+bool   favorite_task_delete(int favorite_id, int user_id);
+
 // 名言
 string quote_random();
