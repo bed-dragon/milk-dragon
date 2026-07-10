@@ -18,11 +18,11 @@ void handle_register(const Request& req, Response& res) { try {
     string password = body["password"];
     string nickname = body.value("nickname", username);
 
-    if (username.length() > 30) {
-        res.status = 400; res.set_content(R"({"ok":false,"error":"用户名最多30个字符"})", "application/json"); return;
+    if (username.length() > 90) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"用户名最多90个字符"})", "application/json"); return;
     }
-    if (nickname.length() > 30) {
-        res.status = 400; res.set_content(R"({"ok":false,"error":"昵称最多30个字符"})", "application/json"); return;
+    if (nickname.length() > 90) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"昵称最多90个字符"})", "application/json"); return;
     }  // 没传昵称就用用户名
 
     int uid = user_create(username, password, nickname);
@@ -118,8 +118,8 @@ void handle_update_profile(const Request& req, Response& res) { try {
     string nickname  = body.value("nickname", "");
     string signature = body.value("signature", "");
 
-    if (nickname.length() > 30) {
-        res.status = 400; res.set_content(R"({"ok":false,"error":"昵称最多30个字符"})", "application/json"); return;
+    if (nickname.length() > 90) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"昵称最多90个字符"})", "application/json"); return;
     }
     if (signature.length() > 100) {
         res.status = 400; res.set_content(R"({"ok":false,"error":"签名最多100个字符"})", "application/json"); return;

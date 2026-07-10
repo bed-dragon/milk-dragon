@@ -46,8 +46,8 @@ void handle_add_material(const Request& req, Response& res) { try {
     json body = json::parse(req.body);
     string title = body["title"];
     string url   = body["url"];
-    if (title.length() > 50) {
-        res.status = 400; res.set_content(R"({"ok":false,"error":"资料标题最多50个字符"})", "application/json"); return;
+    if (title.length() > 150) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"资料标题最多150个字符"})", "application/json"); return;
     }
     if (url.length() > 500) {
         res.status = 400; res.set_content(R"({"ok":false,"error":"链接过长"})", "application/json"); return;

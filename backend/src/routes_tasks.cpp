@@ -54,11 +54,11 @@ void handle_create_task(const Request& req, Response& res) { try {
     Task t;
     t.title       = body["title"];
     t.topic       = body.value("topic", "");
-    if (t.title.length() > 50) {
-        res.status = 400; res.set_content(R"({"ok":false,"error":"任务标题最多50个字符"})", "application/json"); return;
+    if (t.title.length() > 150) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"任务标题最多150个字符"})", "application/json"); return;
     }
-    if (t.topic.length() > 50) {
-        res.status = 400; res.set_content(R"({"ok":false,"error":"主题最多50个字符"})", "application/json"); return;
+    if (t.topic.length() > 150) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"主题最多150个字符"})", "application/json"); return;
     }
     t.deadline    = body.value("deadline", "");
     t.priority    = body.value("priority", 1);
@@ -84,11 +84,11 @@ void handle_update_task(const Request& req, Response& res) { try {
     Task t;
     t.title       = body.value("title", "");
     t.topic       = body.value("topic", "");
-    if (t.title.length() > 50) {
-        res.status = 400; res.set_content(R"({"ok":false,"error":"任务标题最多50个字符"})", "application/json"); return;
+    if (t.title.length() > 150) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"任务标题最多150个字符"})", "application/json"); return;
     }
-    if (t.topic.length() > 50) {
-        res.status = 400; res.set_content(R"({"ok":false,"error":"主题最多50个字符"})", "application/json"); return;
+    if (t.topic.length() > 150) {
+        res.status = 400; res.set_content(R"({"ok":false,"error":"主题最多150个字符"})", "application/json"); return;
     }
     t.deadline    = body.value("deadline", "");
     t.priority    = body.value("priority", 1);
