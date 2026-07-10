@@ -88,6 +88,10 @@ void handle_get_me(const Request& req, Response& res) { try {
 
 // GET /api/users/search?q=关键词
 void handle_search_users(const Request& req, Response& res) { try {
+    string token = req.get_header_value("Authorization");
+    if (token.rfind("Bearer ", 0) != 0) {
+        res.status = 401; res.set_content(R"({"ok":false,"error":"请先登录"})", "application/json"); return;
+    }
     string q = req.get_param_value("q");
     string data = user_search(q);
 

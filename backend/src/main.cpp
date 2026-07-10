@@ -68,9 +68,7 @@ int main() {
                 return user_id_by_token(auth.substr(7));
             }
         }
-        // 兼容旧方式：query param ?user_id=
-        if (req.has_param("user_id")) return stoi(req.get_param_value("user_id"));
-        return 1;  // 默认用户 ID（正式上线后改为 -1 强制登录）
+        return -1;  // 未认证
     };
 
     // 辅助宏：检查登录状态，未登录返回 401
