@@ -97,19 +97,6 @@
         </div>
       </div>
 
-      <!-- 打卡日历 -->
-      <div class="card">
-        <div class="card-header">
-          <h2 class="card-title">📅 打卡日历</h2>
-          <div style="display:flex;gap:var(--space-sm);align-items:center;">
-            <button class="btn btn-outline btn-sm" onclick="prevMonth()">‹</button>
-            <span id="calendarTitle" style="font-weight:600;min-width:120px;text-align:center;"></span>
-            <button class="btn btn-outline btn-sm" onclick="nextMonth()">›</button>
-          </div>
-        </div>
-        <div id="calendar"></div>
-      </div>
-
       <!-- 打卡记录列表 -->
       <div class="card">
         <div class="card-header">
@@ -121,18 +108,31 @@
               <tr>
                 <th>任务名称</th>
                 <th>打卡时间</th>
-                <th>日期</th>
               </tr>
             </thead>
             <tbody id="checkinRecords">
               <tr>
-                <td colspan="3" style="text-align:center;color:var(--text-muted);">
+                <td colspan="2" style="text-align:center;color:var(--text-muted);">
                   暂无打卡记录
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
+      </div>
+
+      <!-- 打卡日历 -->
+      <div class="card" style="padding-bottom:12px;">
+        <div class="card-header" style="padding-bottom:4px;">
+          <h2 class="card-title" style="font-size:15px;">📅 打卡日历</h2>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button class="btn btn-sm btn-outline" onclick="prevMonth()" style="padding:2px 8px;font-size:13px;">‹</button>
+            <span id="calendarTitle" style="font-weight:600;font-size:14px;min-width:100px;text-align:center;"></span>
+            <button class="btn btn-sm btn-outline" onclick="nextMonth()" style="padding:2px 8px;font-size:13px;">›</button>
+            <button class="btn btn-sm btn-primary" onclick="goToToday()" style="margin-left:4px;padding:2px 8px;font-size:12px;">今天</button>
+          </div>
+        </div>
+        <div id="calendar" style="padding:0 12px;"></div>
       </div>
     </main>
   </div>
@@ -150,8 +150,8 @@
 
     document.getElementById('currentDate').textContent = today();
     document.getElementById('checkinDate').value = today();
+    loadMonthCheckins().then(() => renderCalendar());
     loadCheckinData();
-    renderCalendar();
 
     function setToday() {
       document.getElementById('checkinDate').value = today();
@@ -166,7 +166,22 @@
       loadCheckinData();
     }
 
-    // 加载打卡数据
+    // 首次加载：拉取当月所有打卡日期，填充日历
+    async function loadMonthCheckins() {
+      const firstDay = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-01`;
+      const lastDay = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${new Date(currentYear, currentMonth+1, 0).getDate()}`;
+      try {
+        // 拉取本月所有打卡记录
+        const data = await request('GET', `/api/checkins?user_id=1`);
+        (data.data || []).forEach(c => {
+          if (c.date || c.checkin_date) checkinDates.add(c.date || c.checkin_date);
+        });
+      } catch (e) {
+        // MOCK fallback
+        Object.keys(MOCK.checkins || {}).forEach(d => checkinDates.add(d));
+      }
+    }
+
     async function loadCheckinData() {
       const date = document.getElementById('checkinDate').value;
       try {
@@ -174,6 +189,10 @@
           getTasks(),
           getCheckins(date)
         ]);
+        // 标记当天已打卡
+        (checkinData.checkins || []).forEach(c => {
+          if (c.checkin_date || c.date) checkinDates.add(c.checkin_date || c.date);
+        });
         renderTodayTasks(tasksData.tasks || [], checkinData.checkins || []);
       } catch (e) {
         const mockCheckins = MOCK.checkins[date] || [];
@@ -184,7 +203,7 @@
     function renderTodayTasks(tasks, checkins) {
       const container = document.getElementById('todayTasks');
       const checkedIds = new Set(checkins.map(c => c.task_id));
-      const todayTasks = tasks.filter(t => t.status !== 1);
+      const todayTasks = tasks;  // 不再排除已完成任务，改为标记状态
 
       if (!todayTasks.length) {
         container.innerHTML = '<div class="empty-state"><div class="empty-icon">📝</div><p>今天还没有任务，先去任务页面添加吧！</p></div>';
@@ -193,7 +212,8 @@
         return;
       }
 
-      const done = todayTasks.filter(t => checkedIds.has(t.id)).length;
+      // 已完成 = 今天打卡的 + 之前已完成的
+      const done = todayTasks.filter(t => checkedIds.has(t.id) || t.status === 1).length;
       const rate = Math.round((done / todayTasks.length) * 100);
 
       document.getElementById('todayProgress').textContent = `${done} / ${todayTasks.length} 已完成`;
@@ -203,18 +223,23 @@
 
       container.innerHTML = todayTasks.map(t => {
         const checked = checkedIds.has(t.id);
+        const completed = t.status === 1;
+        const done = checked || completed;
+        let label = '';
+        if (checked) label = '已打卡';
+        else if (completed) label = '已完成';
         return `
           <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);">
             <div style="display:flex;align-items:center;gap:var(--space-sm);">
-              <span style="font-size:18px;">${checked ? '✅' : '⬜'}</span>
+              <span style="font-size:18px;">${done ? '✅' : '⬜'}</span>
               <div>
-                <strong style="${checked ? 'text-decoration:line-through;color:var(--text-muted);' : ''}">${t.title}</strong>
+                <strong style="${done ? 'text-decoration:line-through;color:var(--text-muted);' : ''}">${t.title}</strong>
                 <span class="tag ${priorityClass(t.priority)}" style="margin-left:8px;">${priorityLabel(t.priority)}</span>
               </div>
             </div>
             <div>
-              ${checked
-                ? '<span style="color:var(--success);font-size:var(--font-size-sm);">已打卡</span>'
+              ${done
+                ? `<span style="color:var(--success);font-size:var(--font-size-sm);">${label}</span>`
                 : `<button class="btn btn-sm btn-success" onclick="doCheckin(${t.id})">打卡</button>`
               }
             </div>
@@ -250,12 +275,12 @@
 
       title.textContent = `${currentYear} 年 ${currentMonth + 1} 月`;
 
-      let html = '<div class="calendar-grid">';
-      weekDays.forEach(d => { html += `<div class="calendar-header">${d}</div>`; });
-
       const firstDay = new Date(currentYear, currentMonth, 1).getDay();
       const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
       const todayStr = today();
+
+      let html = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;">';
+      weekDays.forEach(d => { html += `<div style="padding:4px 0;font-size:11px;color:var(--text-muted);font-weight:600;">${d}</div>`; });
 
       for (let i = 0; i < firstDay; i++) {
         html += '<div></div>';
@@ -265,23 +290,46 @@
         const dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         const isToday = dateStr === todayStr;
         const isChecked = checkinDates.has(dateStr);
-        html += `<div class="calendar-day${isToday ? ' today' : ''}${isChecked ? ' checked' : ''}">${d}</div>`;
+
+        let bg = 'transparent', color = 'var(--text-primary)', fw = '400';
+        if (isChecked) { bg = 'var(--success)'; color = '#fff'; fw = '600'; }
+        else if (isToday) { bg = 'var(--primary)'; color = '#fff'; fw = '600'; }
+
+        html += `<div style="cursor:pointer;padding:5px 2px;border-radius:4px;font-size:12px;font-weight:${fw};background:${bg};color:${color};" onclick="pickDate('${dateStr}')">${d}</div>`;
       }
 
       html += '</div>';
+      html += '<div style="display:flex;gap:10px;font-size:11px;color:var(--text-muted);padding:6px 0 0;">🟢已打卡 🔵今天</div>';
+
       grid.innerHTML = html;
+    }
+
+    function pickDate(dateStr) {
+      document.getElementById('checkinDate').value = dateStr;
+      loadCheckinData();
+      loadCheckinRecords();
+    }
+
+    function goToToday() {
+      const now = new Date();
+      currentMonth = now.getMonth();
+      currentYear = now.getFullYear();
+      document.getElementById('checkinDate').value = today();
+      loadCheckinData();
+      loadCheckinRecords();
+      renderCalendar();
     }
 
     function prevMonth() {
       currentMonth--;
       if (currentMonth < 0) { currentMonth = 11; currentYear--; }
-      renderCalendar();
+      loadMonthCheckins().then(() => renderCalendar());
     }
 
     function nextMonth() {
       currentMonth++;
       if (currentMonth > 11) { currentMonth = 0; currentYear++; }
-      renderCalendar();
+      loadMonthCheckins().then(() => renderCalendar());
     }
 
     // 加载打卡记录列表
@@ -298,14 +346,13 @@
     function renderRecords(records) {
       const tbody = document.getElementById('checkinRecords');
       if (!records.length) {
-        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);">暂无打卡记录</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;color:var(--text-muted);">暂无打卡记录</td></tr>';
         return;
       }
       tbody.innerHTML = records.map(r => `
         <tr>
           <td>${r.task_title || '任务 #' + r.task_id}</td>
-          <td>${r.checkin_time || '-'}</td>
-          <td>${r.checkin_date}</td>
+          <td>${r.checkin_date} ${r.checkin_time !== '-' ? r.checkin_time : ''}</td>
         </tr>
       `).join('');
     }
