@@ -85,19 +85,6 @@
         </div>
       </div>
 
-      <!-- 打卡日历 -->
-      <div class="card">
-        <div class="card-header">
-          <h2 class="card-title">📅 打卡日历</h2>
-          <div style="display:flex;gap:var(--space-sm);align-items:center;">
-            <button class="btn btn-outline btn-sm" onclick="prevMonth()">‹</button>
-            <span id="calendarTitle" style="font-weight:600;min-width:120px;text-align:center;"></span>
-            <button class="btn btn-outline btn-sm" onclick="nextMonth()">›</button>
-          </div>
-        </div>
-        <div id="calendar"></div>
-      </div>
-
       <!-- 打卡记录列表 -->
       <div class="card">
         <div class="card-header">
@@ -122,6 +109,19 @@
           </table>
         </div>
       </div>
+
+      <!-- 打卡日历 -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">📅 打卡日历</h2>
+          <div style="display:flex;gap:var(--space-sm);align-items:center;">
+            <button class="btn btn-outline btn-sm" onclick="prevMonth()">‹</button>
+            <span id="calendarTitle" style="font-weight:600;min-width:120px;text-align:center;"></span>
+            <button class="btn btn-outline btn-sm" onclick="nextMonth()">›</button>
+          </div>
+        </div>
+        <div id="calendar"></div>
+      </div>
     </main>
   </div>
 
@@ -135,11 +135,48 @@
     let currentMonth = new Date().getMonth();
     let currentYear = new Date().getFullYear();
     let checkinDates = new Set();
+    let stampMap = {};  // { '2026-07-10': 1, '2026-07-11': 2, ... } 每个日期固定的印章编号
+
+    // 根据日期字符串确定印章编号（保证同一日期始终相同）
+    function getStampForDate(dateStr) {
+      if (stampMap[dateStr]) return stampMap[dateStr];
+      // 用日期作哈希，保证同一日期固定同一个章
+      const hash = dateStr.split('-').reduce((acc, s) => acc + parseInt(s), 0);
+      const num = (hash % 3) + 1;
+      stampMap[dateStr] = num;
+      return num;
+    }
+
+    // 加载所有有打卡的日期（用于日历印章展示）
+    async function loadAllCheckinDates() {
+      checkinDates = new Set();
+      stampMap = {};
+      try {
+        // 尝试从后端获取所有打卡记录（不传日期参数 = 查全部）
+        const raw = await request('GET', '/api/checkin');
+        if (raw.data && raw.data.length) {
+          raw.data.forEach(c => {
+            if (c.checkin_date) {
+              checkinDates.add(c.checkin_date);
+              getStampForDate(c.checkin_date);  // 预生成固定印章编号
+            }
+          });
+          return;
+        }
+      } catch (e) { /* 降级到 MOCK */ }
+      // MOCK 降级
+      Object.keys(MOCK.checkins).forEach(d => {
+        checkinDates.add(d);
+        getStampForDate(d);
+      });
+    }
 
     document.getElementById('currentDate').textContent = today();
     document.getElementById('checkinDate').value = today();
-    loadCheckinData();
-    renderCalendar();
+    loadAllCheckinDates().then(() => {
+      loadCheckinData();
+      renderCalendar();
+    });
 
     function setToday() {
       document.getElementById('checkinDate').value = today();
@@ -214,6 +251,10 @@
     // 打卡操作
     async function doCheckin(taskId) {
       const date = document.getElementById('checkinDate').value;
+      // 打卡时随机选一个印章（定下来就不变了）
+      if (!stampMap[date]) {
+        stampMap[date] = Math.floor(Math.random() * 3) + 1;
+      }
       try {
         await _doCheckin(taskId, date);
         showToast('打卡成功！🎉', 'success');
@@ -253,7 +294,9 @@
         const dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         const isToday = dateStr === todayStr;
         const isChecked = checkinDates.has(dateStr);
-        html += `<div class="calendar-day${isToday ? ' today' : ''}${isChecked ? ' checked' : ''}">${d}</div>`;
+        const stampNum = stampMap[dateStr] || '';
+        const stampClass = stampNum ? ' stamp-' + stampNum : '';
+        html += `<div class="calendar-day${isToday ? ' today' : ''}${isChecked ? ' checked' : ''}${stampClass}"><span class="day-text">${d}</span></div>`;
       }
 
       html += '</div>';
@@ -263,13 +306,13 @@
     function prevMonth() {
       currentMonth--;
       if (currentMonth < 0) { currentMonth = 11; currentYear--; }
-      renderCalendar();
+      loadAllCheckinDates().then(() => renderCalendar());
     }
 
     function nextMonth() {
       currentMonth++;
       if (currentMonth > 11) { currentMonth = 0; currentYear++; }
-      renderCalendar();
+      loadAllCheckinDates().then(() => renderCalendar());
     }
 
     // 加载打卡记录列表
