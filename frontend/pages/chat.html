@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学习养成计划 — 聊天</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <!-- 侧边栏 -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-icon">📚</span>
+      <span>学习养成计划</span>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" href="../index.html">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">仪表盘</span>
+      </a>
+      <a class="nav-item" href="tasks.html">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">任务管理</span>
+      </a>
+      <a class="nav-item" href="checkin.html">
+        <span class="nav-icon">✅</span>
+        <span class="nav-label">打卡</span>
+      </a>
+      <a class="nav-item" href="stats.html">
+        <span class="nav-icon">📈</span>
+        <span class="nav-label">数据分析</span>
+      </a>
+      <a class="nav-item" href="reminders.html">
+        <span class="nav-icon">🔔</span>
+        <span class="nav-label">提醒中心</span>
+      </a>
+      <a class="nav-item" href="pomodoro.html">
+        <span class="nav-icon">🍅</span>
+        <span class="nav-label">番茄钟</span>
+      </a>
+      <a class="nav-item" href="profile.html">
+        <span class="nav-icon">👤</span>
+        <span class="nav-label">个人中心</span>
+      </a>
+      <a class="nav-item" href="friends.html">
+        <span class="nav-icon">👥</span>
+        <span class="nav-label">好友</span>
+      </a>
+      <a class="nav-item" href="materials.html">
+        <span class="nav-icon">📎</span>
+        <span class="nav-label">学习资料</span>
+      </a>
+    </nav>
+    <div class="sidebar-user" id="sidebarUserArea">
+      <span class="sidebar-user-name">未登录</span>
+    </div>
+  </aside>
+
+  <!-- 主区域 -->
+  <div class="main-wrapper">
+    <header class="topbar">
+      <h1 class="topbar-title" id="chatTitle">💬 聊天</h1>
+      <div class="topbar-right">
+        <button class="btn btn-outline btn-sm" onclick="refreshMessages()">🔄 刷新</button>
+        <span class="topbar-date" id="currentDate"></span>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="two-col">
+        <!-- 左侧：好友列表 -->
+        <div class="two-col-side">
+          <div style="padding:var(--space-md);border-bottom:1px solid var(--border);font-weight:600;font-size:var(--font-size-sm);color:var(--text-secondary);">
+            好友列表
+          </div>
+          <div id="chatFriendList" class="friend-list" style="overflow-y:auto;">
+            <div class="empty-state" style="padding:12px;">
+              <p style="font-size:var(--font-size-sm);">加载中...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右侧：聊天窗口 -->
+        <div class="two-col-main">
+          <div id="chatPlaceholder" style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);">
+            <div class="empty-state">
+              <div class="empty-icon">💬</div>
+              <p>选择一位好友开始聊天</p>
+            </div>
+          </div>
+          <div id="chatArea" style="display:none;flex:1;flex-direction:column;height:100%;">
+            <div class="chat-messages" id="chatMessages"></div>
+            <div class="chat-input-area">
+              <input class="form-input" type="text" id="msgInput" placeholder="输入消息..." onkeydown="if(event.key==='Enter')send()">
+              <button class="btn btn-primary" onclick="send()" id="sendBtn">发送</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/auth.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/navigation.js"></script>
+  <script>
+    Auth.guard();
+    Auth.renderSidebarUser();
+    document.getElementById('currentDate').textContent = today();
+
+    let activeFriendId = null;
+    let activeFriendName = '';
+
+    // 从 URL 参数读取预设好友
+    const params = new URLSearchParams(window.location.search);
+    const presetFriendId = params.get('friend');
+    const presetFriendName = params.get('name');
+
+    // 加载好友列表
+    async function loadChatFriends() {
+      const container = document.getElementById('chatFriendList');
+      try {
+        const friends = await getFriendList();
+        const accepted = friends.filter(f => f.status === 1);
+        if (!accepted.length) {
+          container.innerHTML = '<div class="empty-state" style="padding:12px;"><p style="font-size:var(--font-size-sm);">暂无好友，先去添加吧</p></div>';
+          return;
+        }
+        container.innerHTML = accepted.map(f => `
+          <div class="friend-item${f.other_id == presetFriendId ? ' active' : ''}" onclick="selectFriend(${f.other_id}, '${(f.other_nick || f.other_name).replace(/'/g, "\\'")}')" data-fid="${f.other_id}">
+            <div class="friend-item-left">
+              <div class="friend-avatar">${(f.other_nick || f.other_name || '?')[0].toUpperCase()}</div>
+              <div class="friend-info">
+                <div class="friend-name">${f.other_nick || f.other_name}</div>
+              </div>
+            </div>
+          </div>
+        `).join('');
+
+        // 如果有预设好友，自动选中
+        if (presetFriendId) {
+          selectFriend(parseInt(presetFriendId), decodeURIComponent(presetFriendName));
+        }
+      } catch (e) {
+        container.innerHTML = '<div class="empty-state" style="padding:12px;"><p style="font-size:var(--font-size-sm);">加载失败</p></div>';
+      }
+    }
+
+    // 选择好友
+    function selectFriend(friendId, friendName) {
+      activeFriendId = friendId;
+      activeFriendName = friendName;
+
+      // 高亮
+      document.querySelectorAll('#chatFriendList .friend-item').forEach(el => {
+        el.classList.toggle('active', parseInt(el.dataset.fid) === friendId);
+      });
+
+      // 显示聊天区
+      document.getElementById('chatPlaceholder').style.display = 'none';
+      document.getElementById('chatArea').style.display = 'flex';
+      document.getElementById('chatTitle').textContent = '💬 ' + friendName;
+
+      refreshMessages();
+    }
+
+    // 刷新消息
+    async function refreshMessages() {
+      if (!activeFriendId) return;
+      const container = document.getElementById('chatMessages');
+      try {
+        const messages = await getMessages(activeFriendId);
+        if (!messages.length) {
+          container.innerHTML = '<div class="empty-state"><p style="color:var(--text-muted);">还没有消息，打个招呼吧！</p></div>';
+          return;
+        }
+        container.innerHTML = messages.map(m => `
+          <div class="chat-bubble ${m.mine ? 'chat-bubble-self' : 'chat-bubble-friend'}">
+            <div>${m.content}</div>
+            <div class="chat-bubble-time">${timeAgo(m.created_at)}</div>
+          </div>
+        `).join('');
+        // 滚动到底部
+        container.scrollTop = container.scrollHeight;
+      } catch (e) {
+        container.innerHTML = '<div class="empty-state"><p style="color:var(--text-muted);">加载消息失败</p></div>';
+      }
+    }
+
+    // 发送消息
+    async function send() {
+      if (!activeFriendId) return;
+      const content = document.getElementById('msgInput').value.trim();
+      if (!content) return;
+
+      const btn = document.getElementById('sendBtn');
+      btn.disabled = true;
+      btn.textContent = '发送中...';
+
+      try {
+        const result = await sendMessage(activeFriendId, content);
+        if (result.ok) {
+          document.getElementById('msgInput').value = '';
+          refreshMessages();
+        } else {
+          showToast(result.error || '发送失败', 'error');
+        }
+      } catch (e) {
+        // Mock: 追加到页面
+        const container = document.getElementById('chatMessages');
+        const bubble = document.createElement('div');
+        bubble.className = 'chat-bubble chat-bubble-self';
+        bubble.innerHTML = '<div>' + content + '</div><div class="chat-bubble-time">刚刚</div>';
+        container.appendChild(bubble);
+        container.scrollTop = container.scrollHeight;
+        document.getElementById('msgInput').value = '';
+        showToast('消息已发送！（模拟）', 'success');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '发送';
+      }
+    }
+
+    loadChatFriends();
+  </script>
+</body>
+</html>
