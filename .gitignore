@@ -36,3 +36,4 @@ backend/server.exe
 backend/sqlite3.o
 backend/*.exe
 backend/*.o
+gen_*.py
