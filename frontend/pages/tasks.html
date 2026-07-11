@@ -29,7 +29,8 @@
         <form id="taskForm" onsubmit="handleTaskSubmit(event)">
           <div class="form-group">
             <label class="form-label" for="taskTitle">任务标题 *</label>
-            <input class="form-input" type="text" id="taskTitle" placeholder="输入任务名称..." required>
+            <input class="form-input" type="text" id="taskTitle" placeholder="输入任务名称..." required maxlength="150">
+            <span class="char-count" id="titleCount"></span>
           </div>
           <div class="flex flex-wrap gap-md">
             <div class="form-group flex-1" style="min-width:180px;">
@@ -46,7 +47,8 @@
             </div>
             <div class="form-group flex-1" style="min-width:150px;">
               <label class="form-label" for="taskTopic">主题分类</label>
-              <input class="form-input" type="text" id="taskTopic" placeholder="如：英语、编程...">
+              <input class="form-input" type="text" id="taskTopic" placeholder="如：英语、编程..." maxlength="150">
+              <span class="char-count" id="topicCount"></span>
             </div>
           </div>
           <div class="form-group">
@@ -182,6 +184,14 @@
 
       if (!task.title) {
         showToast('请输入任务标题', 'warning');
+        return;
+      }
+      if (task.title.length > 150) {
+        showToast('任务标题最多150个字符', 'warning');
+        return;
+      }
+      if (task.topic.length > 150) {
+        showToast('主题最多150个字符', 'warning');
         return;
       }
 
@@ -367,6 +377,20 @@
     loadTasks();
     loadRecommended();
     loadFavorites();
+
+    // 初始化字数计数器
+    document.querySelectorAll('input[maxlength], textarea[maxlength]').forEach(input => {
+      const counter = input.parentElement.querySelector('.char-count');
+      if (!counter) return;
+      const max = input.maxLength;
+      const update = () => {
+        const len = input.value.length;
+        counter.textContent = `${len}/${max}`;
+        counter.classList.toggle('over', len > max * 0.9);
+      };
+      input.addEventListener('input', update);
+      update();
+    });
   </script>
 </body>
 </html>

@@ -460,6 +460,18 @@ textarea.form-input {
   min-height: 80px;
 }
 
+/* 字数计数器 */
+.char-count {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  margin-top: 2px;
+  text-align: right;
+}
+.char-count.over {
+  color: var(--danger);
+  font-weight: 500;
+}
+
 /* 表格 */
 .table-wrapper {
   overflow-x: auto;

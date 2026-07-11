@@ -119,12 +119,13 @@
       <form class="auth-form" id="registerForm">
         <div class="form-group">
           <label class="form-label" for="username">用户名</label>
-          <input class="form-input" type="text" id="username" placeholder="至少 3 个字符" autocomplete="username" required>
-          <div class="form-hint">至少 3 个字符</div>
+          <input class="form-input" type="text" id="username" placeholder="至少 3 个字符" autocomplete="username" required maxlength="90">
+          <span class="char-count" id="usernameCount"></span>
         </div>
         <div class="form-group">
           <label class="form-label" for="nickname">昵称（选填）</label>
-          <input class="form-input" type="text" id="nickname" placeholder="给自己起个好听的名字" autocomplete="off">
+          <input class="form-input" type="text" id="nickname" placeholder="给自己起个好听的名字" autocomplete="off" maxlength="90">
+          <span class="char-count" id="nicknameCount"></span>
         </div>
         <div class="form-group">
           <label class="form-label" for="password">密码</label>
@@ -164,6 +165,20 @@
       errorEl.style.display = 'none';
     }
 
+    // 初始化字数计数器
+    document.querySelectorAll('input[maxlength], textarea[maxlength]').forEach(input => {
+      const counter = input.parentElement.querySelector('.char-count');
+      if (!counter) return;
+      const max = input.maxLength;
+      const update = () => {
+        const len = input.value.length;
+        counter.textContent = `${len}/${max}`;
+        counter.classList.toggle('over', len > max * 0.9);
+      };
+      input.addEventListener('input', update);
+      update();
+    });
+
     document.getElementById('registerForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       hideError();
@@ -176,6 +191,14 @@
       // 前端校验
       if (username.length < 3) {
         showError('用户名至少 3 个字符');
+        return;
+      }
+      if (username.length > 90) {
+        showError('用户名最多90个字符');
+        return;
+      }
+      if (nickname.length > 90) {
+        showError('昵称最多90个字符');
         return;
       }
       if (password.length < 6) {

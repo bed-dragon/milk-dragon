@@ -39,11 +39,13 @@
             </div>
             <div class="form-group">
               <label class="form-label" for="editNickname">昵称</label>
-              <input class="form-input" type="text" id="editNickname" placeholder="给自己起个好听的名字">
+              <input class="form-input" type="text" id="editNickname" placeholder="给自己起个好听的名字" maxlength="90">
+              <span class="char-count" id="nicknameCount"></span>
             </div>
             <div class="form-group">
               <label class="form-label" for="editSignature">个性签名</label>
-              <input class="form-input" type="text" id="editSignature" placeholder="写一句话介绍自己...">
+              <input class="form-input" type="text" id="editSignature" placeholder="写一句话介绍自己..." maxlength="100">
+              <span class="char-count" id="sigCount"></span>
             </div>
             <button type="submit" class="btn btn-primary" id="saveProfileBtn">保存修改</button>
           </form>
@@ -118,6 +120,16 @@
       e.preventDefault();
       const nickname = document.getElementById('editNickname').value.trim();
       const signature = document.getElementById('editSignature').value.trim();
+
+      if (nickname.length > 90) {
+        showToast('昵称最多90个字符', 'warning');
+        return;
+      }
+      if (signature.length > 100) {
+        showToast('签名最多100个字符', 'warning');
+        return;
+      }
+
       const btn = document.getElementById('saveProfileBtn');
       btn.disabled = true;
       btn.textContent = '保存中...';
@@ -182,6 +194,20 @@
     }
 
     loadProfile();
+
+    // 初始化字数计数器
+    document.querySelectorAll('input[maxlength], textarea[maxlength]').forEach(input => {
+      const counter = input.parentElement.querySelector('.char-count');
+      if (!counter) return;
+      const max = input.maxLength;
+      const update = () => {
+        const len = input.value.length;
+        counter.textContent = `${len}/${max}`;
+        counter.classList.toggle('over', len > max * 0.9);
+      };
+      input.addEventListener('input', update);
+      update();
+    });
   </script>
 </body>
 </html>
