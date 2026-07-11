@@ -45,7 +45,10 @@
           <div id="chatArea" style="display:none;flex:1;flex-direction:column;height:100%;">
             <div class="chat-messages" id="chatMessages"></div>
             <div class="chat-input-area">
-              <input class="form-input" type="text" id="msgInput" placeholder="输入消息..." onkeydown="if(event.key==='Enter')send()">
+              <div style="flex:1;">
+                <input class="form-input" type="text" id="msgInput" placeholder="输入消息..." maxlength="3000" onkeydown="if(event.key==='Enter')send()">
+                <span class="char-count" id="msgCount" style="text-align:left;padding-left:4px;"></span>
+              </div>
               <button class="btn btn-primary" onclick="send()" id="sendBtn">发送</button>
             </div>
           </div>
@@ -233,6 +236,10 @@
       if (!activeFriendId) return;
       const content = document.getElementById('msgInput').value.trim();
       if (!content) return;
+      if (content.length > 3000) {
+        showToast('消息内容过长（最多3000字）', 'warning');
+        return;
+      }
 
       const btn = document.getElementById('sendBtn');
       btn.disabled = true;
@@ -267,6 +274,20 @@
     }
 
     loadChatFriends();
+
+    // 初始化字数计数器
+    document.querySelectorAll('input[maxlength], textarea[maxlength]').forEach(input => {
+      const counter = input.parentElement.querySelector('.char-count');
+      if (!counter) return;
+      const max = input.maxLength;
+      const update = () => {
+        const len = input.value.length;
+        counter.textContent = `${len}/${max}`;
+        counter.classList.toggle('over', len > max * 0.9);
+      };
+      input.addEventListener('input', update);
+      update();
+    });
   </script>
   <style>
     /* 聊天气泡动画 */

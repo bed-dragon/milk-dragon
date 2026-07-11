@@ -29,11 +29,13 @@
           <div style="display:flex;gap:var(--space-md);flex-wrap:wrap;">
             <div class="form-group flex-1" style="min-width:200px;">
               <label class="form-label" for="matTitle">标题</label>
-              <input class="form-input" type="text" id="matTitle" placeholder="资料名称..." required>
+              <input class="form-input" type="text" id="matTitle" placeholder="资料名称..." required maxlength="150">
+              <span class="char-count" id="titleCount"></span>
             </div>
             <div class="form-group flex-1" style="min-width:300px;">
               <label class="form-label" for="matUrl">链接</label>
-              <input class="form-input" type="url" id="matUrl" placeholder="https://..." required>
+              <input class="form-input" type="url" id="matUrl" placeholder="https://..." required maxlength="500">
+              <span class="char-count" id="urlCount"></span>
             </div>
           </div>
           <button type="submit" class="btn btn-primary" id="addBtn">添加收藏</button>
@@ -113,6 +115,14 @@
         showToast('请填写标题和链接', 'warning');
         return;
       }
+      if (title.length > 150) {
+        showToast('资料标题最多150个字符', 'warning');
+        return;
+      }
+      if (url.length > 500) {
+        showToast('链接过长（最多500个字符）', 'warning');
+        return;
+      }
 
       const btn = document.getElementById('addBtn');
       btn.disabled = true;
@@ -158,6 +168,20 @@
     }
 
     loadMaterials();
+
+    // 初始化字数计数器
+    document.querySelectorAll('input[maxlength], textarea[maxlength]').forEach(input => {
+      const counter = input.parentElement.querySelector('.char-count');
+      if (!counter) return;
+      const max = input.maxLength;
+      const update = () => {
+        const len = input.value.length;
+        counter.textContent = `${len}/${max}`;
+        counter.classList.toggle('over', len > max * 0.9);
+      };
+      input.addEventListener('input', update);
+      update();
+    });
   </script>
 </body>
 </html>
